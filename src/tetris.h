@@ -400,11 +400,14 @@ class Board {
       for (int row = 0; row < 20; row++) {
         for (int col = 0; col < 10; col++) {
           Block b = blocks[row][col];
-          if (b.empty) continue;
-          for (int j = 0; j < 4; j++) {
-            sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, b.dcolor);
-            sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, b.lcolor);
-            sprite.fillRect(b.col * BLOCK_SIZE + BEVEL, b.row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, b.color);
+          if (b.empty) {
+            sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, TFT_BLACK);
+          } else {
+            for (int j = 0; j < 4; j++) {
+              sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, b.dcolor);
+              sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, b.lcolor);
+              sprite.fillRect(b.col * BLOCK_SIZE + BEVEL, b.row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, b.color);
+            }
           }
         }
       }
@@ -441,6 +444,7 @@ class Tetris {
     }
 
     Mino randomMino() {
+      return MinoO(0, 4);
       Mino next = bag[mino_idx];
       mino_idx++;
       if (mino_idx == 7) {
@@ -501,7 +505,7 @@ class Tetris {
             if (deletable[i]) board.delete_rows_animated(i, 0, 9);
           }
           board.render();
-          delay(50);
+          // delay(50);
 
           board.fill_deleted_lines();
           board.render();
