@@ -12,7 +12,7 @@ constexpr uint16_t lighten(uint16_t color, float amount) {
   uint8_t g = (color >> 5) & 0x3F;
   uint8_t b = (color) & 0x1F;
   r += (31 - r) * amount;
-  g += (31 - g) * amount;
+  g += (63 - g) * amount;
   b += (31 - b) * amount;
   return (r << 11) | (g << 5) | b;
 }
