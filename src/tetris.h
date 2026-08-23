@@ -365,10 +365,8 @@ class Tetris {
       int land_reset_cnt = 0;
 
       while (true) {
-        // Serial.print("tick!\n");
         boolean deletable_rows_exists = board.deletable_rows_exists();
         if (deletable_rows_exists) {
-          // Serial.print("deletable_rows_exists!!\n");
           std::array<boolean, 20> deletable = board.deletable_rows();
           for (int i = 0; i < 20; i++) {
             if (deletable[i]) {
@@ -534,7 +532,6 @@ class Tetris {
     }
 
     void render() {
-      // Serial.print("render\n");
       int x = board_grid_top_left_x+1;
       int y = board_grid_top_left_y+1;
 
@@ -561,8 +558,6 @@ class Tetris {
         board_sprite.drawRect(board.cur_mino.positions[i].col * block_size, (board.cur_mino.positions[i].row + distance) * block_size, block_size, block_size, board.cur_mino.color.base);
         board_sprite.drawRect(board.cur_mino.positions[i].col * block_size + 1, (board.cur_mino.positions[i].row + distance) * block_size + 1, block_size - 2, block_size - 2, board.cur_mino.color.base);
       }
-
-      // Serial.print(board.cur_mino.color.base);
 
       // cur_mino
       for (int i = 0; i < 4; i++) {
