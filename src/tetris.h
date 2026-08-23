@@ -559,7 +559,6 @@ class Tetris {
       if (board.cur_mino_exists()) {
         // ghosts
         int distance = board.hard_drop_distance();
-        // Serial.printf("hard_drop_distance: %d on cur_mino (%d, %d), (%d, %d), (%d, %d), (%d, %d)\n", distance, board.cur_mino->positions[0].row, board.cur_mino->positions[0].col, board.cur_mino->positions[1].row, board.cur_mino->positions[1].col, board.cur_mino->positions[2].row, board.cur_mino->positions[2].col, board.cur_mino->positions[3].row, board.cur_mino->positions[3].col);
         for (int i = 0; i < 4; i++) {
           board_sprite.drawRect(board.cur_mino->positions[i].col * block_size, (board.cur_mino->positions[i].row + distance) * block_size, block_size, block_size, board.cur_mino->color.base);
           board_sprite.drawRect(board.cur_mino->positions[i].col * block_size + 1, (board.cur_mino->positions[i].row + distance) * block_size + 1, block_size - 2, block_size - 2, board.cur_mino->color.base);
