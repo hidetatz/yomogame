@@ -126,7 +126,6 @@ class Mino {
     BlockColor color;
     std::array<BlockPos, 4> positions;
     Mino(char kind, uint16_t base_color, std::array<BlockPos, 4> positions) : color(base_color), positions(positions), kind(kind) {}
-    Mino() : color(0), positions{BlockPos(0, 0), BlockPos(0, 0), BlockPos(0, 0), BlockPos(0, 0)} {}
 
     static Mino O(int row, int col) {
       return Mino('O', TFT_YELLOW, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col+1)}});
@@ -181,9 +180,13 @@ class Block {
 
 class Board {
   public:
-    Mino cur_mino;
+    std::optional<Mino> cur_mino;
     std::optional<Block> blocks[20][10]; // block position is managed by the index in blocks, not BlockPos
     Board() {}
+
+    boolean cur_mino_exists() {
+      return cur_mino.has_value();
+    }
 
     boolean block_exists(int row, int col) {
       return blocks[row][col].has_value();
@@ -208,7 +211,7 @@ class Board {
 
     boolean can_move_mino(int dir, int distance) {
       for (int i = 0; i < 4; i++) {
-        BlockPos cur_pos = cur_mino.positions[i];
+        BlockPos cur_pos = cur_mino->positions[i];
         int new_row = cur_pos.row;
         int new_col = cur_pos.col;
         if (dir == down) new_row += distance;
@@ -220,9 +223,9 @@ class Board {
     }
 
     void move_mino(int dir, int distance) {
-      if (dir == down) cur_mino.down(distance);
-      else if (dir == right) cur_mino.right(distance);
-      else cur_mino.left(distance);
+      if (dir == down) cur_mino->down(distance);
+      else if (dir == right) cur_mino->right(distance);
+      else cur_mino->left(distance);
     }
 
     boolean mino_landed() {
@@ -230,17 +233,18 @@ class Board {
     }
 
     void fix_mino() {
-      for (int i = 0; i < 4; i++) blocks[cur_mino.positions[i].row][cur_mino.positions[i].col] = Block(cur_mino.color);
+      for (int i = 0; i < 4; i++) blocks[cur_mino->positions[i].row][cur_mino->positions[i].col] = Block(cur_mino->color);
+      cur_mino = std::nullopt;
     }
 
     // how many down happens on hard drop?
     int hard_drop_distance() {
-      for (int distance = 20; distance >= 1; distance--) {
-        if (can_move_mino(down, distance)) {
-          return distance;
-        }
+      int cur_limit = 0;
+      for (int distance = 1; distance < 20; distance++) {
+        if (!can_move_mino(down, distance)) break;
+        cur_limit = distance;
       }
-      return 0;
+      return cur_limit;
     }
 
     boolean is_full_row(int row) {
@@ -552,19 +556,22 @@ class Tetris {
         }
       }
 
-      // ghosts
-      int distance = board.hard_drop_distance();
-      for (int i = 0; i < 4; i++) {
-        board_sprite.drawRect(board.cur_mino.positions[i].col * block_size, (board.cur_mino.positions[i].row + distance) * block_size, block_size, block_size, board.cur_mino.color.base);
-        board_sprite.drawRect(board.cur_mino.positions[i].col * block_size + 1, (board.cur_mino.positions[i].row + distance) * block_size + 1, block_size - 2, block_size - 2, board.cur_mino.color.base);
-      }
+      if (board.cur_mino_exists()) {
+        // ghosts
+        int distance = board.hard_drop_distance();
+        // Serial.printf("hard_drop_distance: %d on cur_mino (%d, %d), (%d, %d), (%d, %d), (%d, %d)\n", distance, board.cur_mino->positions[0].row, board.cur_mino->positions[0].col, board.cur_mino->positions[1].row, board.cur_mino->positions[1].col, board.cur_mino->positions[2].row, board.cur_mino->positions[2].col, board.cur_mino->positions[3].row, board.cur_mino->positions[3].col);
+        for (int i = 0; i < 4; i++) {
+          board_sprite.drawRect(board.cur_mino->positions[i].col * block_size, (board.cur_mino->positions[i].row + distance) * block_size, block_size, block_size, board.cur_mino->color.base);
+          board_sprite.drawRect(board.cur_mino->positions[i].col * block_size + 1, (board.cur_mino->positions[i].row + distance) * block_size + 1, block_size - 2, block_size - 2, board.cur_mino->color.base);
+        }
 
-      // cur_mino
-      for (int i = 0; i < 4; i++) {
-        BlockPos b = board.cur_mino.positions[i];
-        board_sprite.fillRect(b.col * block_size, b.row * block_size, block_size, block_size, board.cur_mino.color.darker);
-        board_sprite.fillRect(b.col * block_size, b.row * block_size, block_size - bevel, block_size - bevel, board.cur_mino.color.lighter);
-        board_sprite.fillRect(b.col * block_size + bevel, b.row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, board.cur_mino.color.base);
+        // cur_mino
+        for (int i = 0; i < 4; i++) {
+          BlockPos b = board.cur_mino->positions[i];
+          board_sprite.fillRect(b.col * block_size, b.row * block_size, block_size, block_size, board.cur_mino->color.darker);
+          board_sprite.fillRect(b.col * block_size, b.row * block_size, block_size - bevel, block_size - bevel, board.cur_mino->color.lighter);
+          board_sprite.fillRect(b.col * block_size + bevel, b.row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, board.cur_mino->color.base);
+        }
       }
       board_sprite.pushSprite(x, y);
     }
