@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <optional>
 #include <Arduino.h>
 #include <SPI.h>
 #include <TFT_eSPI.h> 
@@ -26,27 +27,27 @@ constexpr uint16_t darken(uint16_t color, float amount) {
   return (r << 11) | (g << 5) | b;
 }
 
-const uint16_t yellow = TFT_YELLOW;
-constexpr uint16_t yellow_l = lighten(yellow, 0.4);
-constexpr uint16_t yellow_d = darken(yellow, 0.4);
-const uint16_t lightblue = TFT_SKYBLUE;
-constexpr uint16_t lightblue_l = lighten(lightblue, 0.4);
-constexpr uint16_t lightblue_d = darken(lightblue, 0.4);
-const uint16_t purple = TFT_PURPLE;
-constexpr uint16_t purple_l = lighten(purple, 0.4);
-constexpr uint16_t purple_d = darken(purple, 0.4);
-const uint16_t orange = TFT_ORANGE;
-constexpr uint16_t orange_l = lighten(orange, 0.4);
-constexpr uint16_t orange_d = darken(orange, 0.4);
-const uint16_t darkblue = TFT_DARKCYAN;
-constexpr uint16_t darkblue_l = lighten(darkblue, 0.4);
-constexpr uint16_t darkblue_d = darken(darkblue, 0.4);
-const uint16_t green = TFT_GREEN;
-constexpr uint16_t green_l = lighten(green, 0.4);
-constexpr uint16_t green_d = darken(green, 0.4);
-const uint16_t red = TFT_RED;
-constexpr uint16_t red_l = lighten(red, 0.4);
-constexpr uint16_t red_d = darken(red, 0.4);
+// const uint16_t yellow = TFT_YELLOW;
+// constexpr uint16_t yellow_l = lighten(yellow, 0.4);
+// constexpr uint16_t yellow_d = darken(yellow, 0.4);
+// const uint16_t lightblue = TFT_SKYBLUE;
+// constexpr uint16_t lightblue_l = lighten(lightblue, 0.4);
+// constexpr uint16_t lightblue_d = darken(lightblue, 0.4);
+// const uint16_t purple = TFT_PURPLE;
+// constexpr uint16_t purple_l = lighten(purple, 0.4);
+// constexpr uint16_t purple_d = darken(purple, 0.4);
+// const uint16_t orange = TFT_ORANGE;
+// constexpr uint16_t orange_l = lighten(orange, 0.4);
+// constexpr uint16_t orange_d = darken(orange, 0.4);
+// const uint16_t darkblue = TFT_DARKCYAN;
+// constexpr uint16_t darkblue_l = lighten(darkblue, 0.4);
+// constexpr uint16_t darkblue_d = darken(darkblue, 0.4);
+// const uint16_t green = TFT_GREEN;
+// constexpr uint16_t green_l = lighten(green, 0.4);
+// constexpr uint16_t green_d = darken(green, 0.4);
+// const uint16_t red = TFT_RED;
+// constexpr uint16_t red_l = lighten(red, 0.4);
+// constexpr uint16_t red_d = darken(red, 0.4);
 
 class ButtonState {
   public:
@@ -117,90 +118,65 @@ class Input {
     }
 };
 
-class Block {
+class BlockColor {
+  public:
+    uint16_t base;
+    uint16_t lighter;
+    uint16_t darker;
+    BlockColor(uint16_t base) : base(base) {
+      lighter = lighten(base, 0.4);
+      darker = darken(base, 0.4);
+    }
+};
+
+class BlockPos {
   public:
     int row;
     int col;
-    uint16_t color;
-    uint16_t lcolor;
-    uint16_t dcolor;
-    boolean empty;
-    Block(int row, int col, uint16_t color, uint16_t lcolor, uint16_t dcolor) : row(row), col(col), color(color), lcolor(lcolor), dcolor(dcolor) {
-      empty = false;
-    }
-    Block() {
-      empty = true;
-    }
+    BlockPos(int row, int col) : row(row), col(col) {}
 };
 
 class Mino {
   public:
-    Block blocks[4];
+    BlockColor color;
+    std::array<BlockPos, 4> positions;
+    Mino(uint16_t base_color, std::array<BlockPos, 4> positions) : color(base_color), positions(positions) {}
+    Mino() : color(0), positions{BlockPos(0, 0), BlockPos(0, 0), BlockPos(0, 0), BlockPos(0, 0)} {}
 };
 
 class MinoO : public Mino {
   public:
-    MinoO(int row, int col) {
-      blocks[0] = Block(row, col, yellow, yellow_l, yellow_d);
-      blocks[1] = Block(row, col+1, yellow, yellow_l, yellow_d);
-      blocks[2] = Block(row-1, col, yellow, yellow_l, yellow_d);
-      blocks[3] = Block(row-1, col+1, yellow, yellow_l, yellow_d);
-    }
+    MinoO(int row, int col) : Mino(TFT_YELLOW, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col+1)}}) {}
 };
 
 class MinoI : public Mino {
   public:
-    MinoI(int row, int col) {
-      blocks[0] = Block(row, col, lightblue, lightblue_l, lightblue_d);
-      blocks[1] = Block(row, col+1, lightblue, lightblue_l, lightblue_d);
-      blocks[2] = Block(row, col+2, lightblue, lightblue_l, lightblue_d);
-      blocks[3] = Block(row, col+3, lightblue, lightblue_l, lightblue_d);
-    }
+    MinoI(int row, int col) : Mino(TFT_SKYBLUE, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row, col+3)}}) {}
 };
+
 class MinoT : public Mino {
   public:
-    MinoT(int row, int col) {
-      blocks[0] = Block(row, col, purple, purple_l, purple_d);
-      blocks[1] = Block(row, col+1, purple, purple_l, purple_d);
-      blocks[2] = Block(row, col+2, purple, purple_l, purple_d);
-      blocks[3] = Block(row-1, col+1, purple, purple_l, purple_d);
-    }
+    MinoT(int row, int col) : Mino(TFT_PURPLE, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+1)}}) {}
 };
+
 class MinoL : public Mino {
   public:
-    MinoL(int row, int col) {
-      blocks[0] = Block(row, col, orange, orange_l, orange_d);
-      blocks[1] = Block(row, col+1, orange, orange_l, orange_d);
-      blocks[2] = Block(row, col+2, orange, orange_l, orange_d);
-      blocks[3] = Block(row-1, col+2, orange, orange_l, orange_d);
-    }
+    MinoL(int row, int col) : Mino(TFT_ORANGE, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+2)}}) {}
 };
+
 class MinoJ : public Mino {
   public:
-    MinoJ(int row, int col) {
-      blocks[0] = Block(row, col, darkblue, darkblue_l, darkblue_d);
-      blocks[1] = Block(row, col+1, darkblue, darkblue_l, darkblue_d);
-      blocks[2] = Block(row, col+2, darkblue, darkblue_l, darkblue_d);
-      blocks[3] = Block(row-1, col, darkblue, darkblue_l, darkblue_d);
-    }
+    MinoJ(int row, int col) : Mino(TFT_DARKCYAN, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col)}}) {}
 };
+
 class MinoS : public Mino {
   public:
-    MinoS(int row, int col) {
-      blocks[0] = Block(row, col, green, green_l, green_d);
-      blocks[1] = Block(row, col+1, green, green_l, green_d);
-      blocks[2] = Block(row-1, col+1, green, green_l, green_d);
-      blocks[3] = Block(row-1, col+2, green, green_l, green_d);
-    }
+    MinoS(int row, int col) : Mino(TFT_GREEN, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col+1), BlockPos(row-1, col+2)}}) {}
 };
+
 class MinoZ : public Mino {
   public:
-    MinoZ(int row, int col) {
-      blocks[0] = Block(row, col, red, red_l, red_d);
-      blocks[1] = Block(row, col+1, red, red_l, red_d);
-      blocks[2] = Block(row-1, col, red, red_l, red_d);
-      blocks[3] = Block(row-1, col-1, red, red_l, red_d);
-    }
+    MinoZ(int row, int col) : Mino(TFT_RED, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col-1)}}) {}
 };
 
 const int down = 0;
@@ -222,111 +198,78 @@ class Board {
     int y;
     uint16_t bgcolor;
     Mino cur_mino;
-    Block blocks[ROWS][COLS];
+    std::optional<BlockColor> block_colors[ROWS][COLS];
     TFT_eSprite sprite;
 
   public:
-    Board(int x, int y, uint16_t bgcolor, TFT_eSPI* screen) : x(x), y(y), bgcolor(bgcolor), sprite(screen) {
+    Board(int x, int y, uint16_t bgcolor, TFT_eSPI* screen) : x(x), y(y), bgcolor(bgcolor), cur_mino(), sprite(screen) {
       sprite.createSprite(COLS * BLOCK_SIZE, ROWS * BLOCK_SIZE);
-      for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
-          blocks[row][col] = Block();
-        }
-      }
     }
 
-    boolean can_place_mino(Mino m) {
+    boolean mino_placable(Mino m) {
       for (int i = 0; i < 4; i++) {
-        if (!can_place_block(m.blocks[i].row, m.blocks[i].col)) return false;
+        if (!placable_at(m.positions[i])) return false;
       }
       return true;
     }
 
-    boolean can_place_block(int row, int col) {
-      if (col < 0 || COLS <= col || ROWS <= row) return false;
-      if (row < 0) return true;
-      return blocks[row][col].empty;
+    boolean placable_at(BlockPos pos) {
+      if (pos.col < 0 || COLS <= pos.col || ROWS <= pos.row) return false;
+      if (pos.row < 0) return true;
+      return !block_colors[pos.row][pos.col].has_value();
     }
 
     void place_mino(Mino m) {
       cur_mino = m;
     }
 
-    boolean can_move_mino(int dir) {
+    boolean can_move_mino(int dir, int distance) {
       for (int i = 0; i < 4; i++) {
-        Block b = cur_mino.blocks[i];
-        int new_row = b.row;
-        int new_col = b.col;
-
-        if (dir == down) new_row++;
-        else if (dir == right) new_col++;
-        else new_col--;
-
-        if (!can_place_block(new_row, new_col)) return false;
+        BlockPos newpos = cur_mino.positions[i];
+        if (dir == down) newpos.row += distance;
+        else if (dir == right) newpos.col += distance;
+        else newpos.col -= distance;
+        if (!placable_at(newpos)) return false;
       }
       return true;
     }
 
-    void move_mino(int dir) {
+    void move_mino(int dir, int distance) {
       for (int i = 0; i < 4; i++) {
-        Block& b = cur_mino.blocks[i];
-        if (dir == down) b.row++;
-        else if (dir == right) b.col++;
-        else b.col--;
+        if (dir == down) cur_mino.positions[i].row += distance;
+        else if (dir == right) cur_mino.positions[i].col += distance;
+        else cur_mino.positions[i].col -= distance;
       }
     }
 
     boolean mino_landed() {
       for (int i = 0; i < 4; i++) {
-        Block& b = cur_mino.blocks[i];
-        if (b.row == ROWS-1) return true;
-        if (!blocks[b.row + 1][b.col].empty) return true;
+        if (cur_mino.positions[i].row == ROWS-1) return true;
+        if (block_colors[cur_mino.positions[i].row + 1][cur_mino.positions[i].col].has_value()) return true;
       }
       return false;
     }
 
     void fix_mino() {
       for (int i = 0; i < 4; i++) {
-        Block& b = cur_mino.blocks[i];
-        blocks[b.row][b.col] = b;
+        block_colors[cur_mino.positions[i].row][cur_mino.positions[i].col] = cur_mino.color;
       }
     }
 
-    std::array<int, 8> hard_dropped_pos() {
-      int d = 1;
-      while (true) {
-        boolean ok = true;
-        for (int i = 0; i < 4; i++) {
-          Block b = cur_mino.blocks[i];
-          if (!can_place_block(b.row+d, b.col)) { ok = false; break; }
+    int hard_drop_distance() {
+      for (int distance = 20; distance >= 1; distance--) {
+        if (can_move_mino(down, distance)) {
+          return distance;
         }
-        if (!ok) break;
-        d++;
       }
-      d--;
-
-      std::array<int, 8> pos{};
-      for (int i = 0; i < 4; i++) {
-        pos[i*2] = cur_mino.blocks[i].row + d;
-        pos[i*2+1] = cur_mino.blocks[i].col;
-      }
-      return pos;
-    }
-
-    void hard_drop() {
-      std::array<int, 8> hard_drop_pos = hard_dropped_pos();
-      for (int i = 0; i < 4; i++) {
-        Block& b = cur_mino.blocks[i];
-        b.row = hard_drop_pos[i * 2];
-        b.col = hard_drop_pos[i * 2 + 1];
-      }
+      return 0;
     }
 
     boolean deletable_rows_exists() {
       for (int row = 0; row < ROWS; row++) {
         boolean all_block_exists = true;
         for (int col = 0; col < COLS; col++) {
-          if (blocks[row][col].empty) {
+          if (!block_colors[row][col].has_value()) {
             all_block_exists = false;
             break;
           }
@@ -341,7 +284,7 @@ class Board {
       for (int row = 0; row < ROWS; row++) {
         boolean all_block_exists = true;
         for (int col = 0; col < COLS; col++) {
-          if (blocks[row][col].empty) {
+          if (!block_colors[row][col].has_value()) {
             all_block_exists = false;
             break;
           }
@@ -352,8 +295,8 @@ class Board {
     }
 
     void delete_rows_animated(int row, int col1, int col2) {
-      blocks[row][col1] = Block();
-      blocks[row][col2] = Block();
+      block_colors[row][col1] = std::nullopt;
+      block_colors[row][col2] = std::nullopt;
     }
 
     void fill_deleted_lines() {
@@ -362,15 +305,14 @@ class Board {
       for (int read_row = ROWS - 1; read_row >= 0; read_row--) {
         boolean row_has_block = false;
         for (int col = 0; col < COLS; col++) {
-          if (!blocks[read_row][col].empty) { row_has_block = true; break; }
+          if (block_colors[read_row][col].has_value()) { row_has_block = true; break; }
         }
 
         if (row_has_block) {
           if (write_row != read_row) {
             for (int col = 0; col < COLS; col++) {
-              blocks[write_row][col] = blocks[read_row][col];
-              blocks[write_row][col].row = write_row;
-              blocks[read_row][col] = Block();
+              block_colors[write_row][col] = block_colors[read_row][col];
+              block_colors[read_row][col] = std::nullopt;
             }
           }
           write_row--;
@@ -384,32 +326,31 @@ class Board {
       // blocks
       for (int row = 0; row < 20; row++) {
         for (int col = 0; col < 10; col++) {
-          Block b = blocks[row][col];
-          if (b.empty) {
-            sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, TFT_BLACK);
+          if (!block_colors[row][col].has_value()) {
+            sprite.fillRect(col * BLOCK_SIZE, row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, TFT_BLACK);
           } else {
             for (int j = 0; j < 4; j++) {
-              sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, b.dcolor);
-              sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, b.lcolor);
-              sprite.fillRect(b.col * BLOCK_SIZE + BEVEL, b.row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, b.color);
+              sprite.fillRect(col * BLOCK_SIZE, row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, block_colors[row][col]->base);
+              sprite.fillRect(col * BLOCK_SIZE, row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, block_colors[row][col]->lighter);
+              sprite.fillRect(col * BLOCK_SIZE + BEVEL, row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, block_colors[row][col]->darker);
             }
           }
         }
       }
 
       // ghosts
-      std::array<int, 8> hard_drop_pos = hard_dropped_pos();
+      int distance = hard_drop_distance();
       for (int i = 0; i < 4; i++) {
-        sprite.drawRect((hard_drop_pos[i * 2 + 1]) * BLOCK_SIZE, (hard_drop_pos[i * 2]) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, cur_mino.blocks[i].color);
-        sprite.drawRect((hard_drop_pos[i * 2 + 1]) * BLOCK_SIZE + 1, (hard_drop_pos[i * 2]) * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2, cur_mino.blocks[i].color);
+        sprite.drawRect(cur_mino.positions[i].col * BLOCK_SIZE, (cur_mino.positions[i].row + distance) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, cur_mino.color.base);
+        sprite.drawRect(cur_mino.positions[i].col * BLOCK_SIZE + 1, (cur_mino.positions[i].row + distance) * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2, cur_mino.color.base);
       }
 
       // cur_mino
       for (int i = 0; i < 4; i++) {
-        Block b = cur_mino.blocks[i];
-        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, b.dcolor);
-        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, b.lcolor);
-        sprite.fillRect(b.col * BLOCK_SIZE + BEVEL, b.row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, b.color);
+        BlockPos b = cur_mino.positions[i];
+        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, cur_mino.color.darker);
+        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, cur_mino.color.lighter);
+        sprite.fillRect(b.col * BLOCK_SIZE + BEVEL, b.row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, cur_mino.color.base);
       }
       sprite.pushSprite(x, y);
     }
@@ -419,20 +360,11 @@ class Tetris {
   private:
     TFT_eSPI screen;
     Input input;
-    Mino bag[7];
+    std::array<Mino, 7> bag;
     int mino_idx;
 
   public:
-    Tetris(TFT_eSPI screen, Input input) : screen(screen), input(input) {
-      bag[0] = MinoL(0, 3);
-      bag[1] = MinoJ(0, 3);
-      bag[2] = MinoI(0, 3);
-      bag[3] = MinoO(0, 4);
-      bag[4] = MinoS(0, 3);
-      bag[5] = MinoZ(0, 3);
-      bag[6] = MinoT(0, 3);
-      mino_idx = 0;
-    }
+    Tetris(TFT_eSPI screen, Input input) : screen(screen), input(input), bag{MinoL(0, 3), MinoJ(0, 3), MinoI(0, 3), MinoO(0, 4), MinoS(0, 3), MinoZ(0, 3), MinoT(0, 3)}, mino_idx(0) {}
 
     void shuffle_bag() {
       for (int i = 0; i < 7; i++) {
@@ -511,7 +443,7 @@ class Tetris {
 
         if (need_new_mino) {
           Mino m = randomMino();
-          if (!board.can_place_mino(m)) {
+          if (!board.mino_placable(m)) {
             Serial.println("Game over");
             while (true) delay(1000);
           }
@@ -527,8 +459,8 @@ class Tetris {
 
         if (btns.UP) {
           int i = 0;
-          while (board.can_move_mino(down)) {
-            board.move_mino(down);
+          while (board.can_move_mino(down, 1)) {
+            board.move_mino(down, 1);
             if (landed != 0) {
               landed = 0;
               land_reset_cnt++;
@@ -544,8 +476,8 @@ class Tetris {
         }
 
         if (btns.DOWN && !was_down) {
-          if (board.can_move_mino(down)) {
-            board.move_mino(down);
+          if (board.can_move_mino(down, 1)) {
+            board.move_mino(down, 1);
             if (landed != 0) {
               landed = 0;
               land_reset_cnt++;
@@ -556,8 +488,8 @@ class Tetris {
         was_down = btns.DOWN;
 
         if (now - gravity_tick >= (btns.DOWN ? SOFT_DROP_MS : GRAVITY_MS)) {
-          if (board.can_move_mino(down)) {
-            board.move_mino(down);
+          if (board.can_move_mino(down, 1)) {
+            board.move_mino(down, 1);
             if (landed != 0) {
               landed = 0;
               land_reset_cnt++;
@@ -574,8 +506,8 @@ class Tetris {
           held_dir = dir;
           das_charged = false;
           if (dir != -1) {
-            if (board.can_move_mino(dir)) {
-              board.move_mino(dir);
+            if (board.can_move_mino(dir, 1)) {
+              board.move_mino(dir, 1);
               if (landed != 0) {
                 landed = 0;
                 land_reset_cnt++;
@@ -588,8 +520,8 @@ class Tetris {
             if (now - das_start >= 300) {
               das_charged = true;
               last_repeat = now;
-              if (board.can_move_mino(dir)) {
-                board.move_mino(dir);
+              if (board.can_move_mino(dir, 1)) {
+                board.move_mino(dir, 1);
                 if (landed != 0) {
                   landed = 0;
                   land_reset_cnt++;
@@ -599,8 +531,8 @@ class Tetris {
           } else {
             if (now - last_repeat >= 50) {
               last_repeat += 50;
-              if (board.can_move_mino(dir)) {
-                board.move_mino(dir);
+              if (board.can_move_mino(dir, 1)) {
+                board.move_mino(dir, 1);
                 if (landed != 0) {
                   landed = 0;
                   land_reset_cnt++;
