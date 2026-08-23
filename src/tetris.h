@@ -381,21 +381,6 @@ class Board {
     void render() {
       sprite.fillSprite(bgcolor);
 
-      // ghosts
-      std::array<int, 8> hard_drop_pos = hard_dropped_pos();
-      for (int i = 0; i < 4; i++) {
-        sprite.drawRect((hard_drop_pos[i * 2 + 1]) * BLOCK_SIZE, (hard_drop_pos[i * 2]) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, cur_mino.blocks[i].color);
-        sprite.drawRect((hard_drop_pos[i * 2 + 1]) * BLOCK_SIZE + 1, (hard_drop_pos[i * 2]) * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2, cur_mino.blocks[i].color);
-      }
-
-      // cur_mino
-      for (int i = 0; i < 4; i++) {
-        Block b = cur_mino.blocks[i];
-        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, b.dcolor);
-        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, b.lcolor);
-        sprite.fillRect(b.col * BLOCK_SIZE + BEVEL, b.row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, b.color);
-      }
-
       // blocks
       for (int row = 0; row < 20; row++) {
         for (int col = 0; col < 10; col++) {
@@ -410,6 +395,21 @@ class Board {
             }
           }
         }
+      }
+
+      // ghosts
+      std::array<int, 8> hard_drop_pos = hard_dropped_pos();
+      for (int i = 0; i < 4; i++) {
+        sprite.drawRect((hard_drop_pos[i * 2 + 1]) * BLOCK_SIZE, (hard_drop_pos[i * 2]) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, cur_mino.blocks[i].color);
+        sprite.drawRect((hard_drop_pos[i * 2 + 1]) * BLOCK_SIZE + 1, (hard_drop_pos[i * 2]) * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2, cur_mino.blocks[i].color);
+      }
+
+      // cur_mino
+      for (int i = 0; i < 4; i++) {
+        Block b = cur_mino.blocks[i];
+        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, b.dcolor);
+        sprite.fillRect(b.col * BLOCK_SIZE, b.row * BLOCK_SIZE, BLOCK_SIZE - BEVEL, BLOCK_SIZE - BEVEL, b.lcolor);
+        sprite.fillRect(b.col * BLOCK_SIZE + BEVEL, b.row * BLOCK_SIZE + BEVEL, BLOCK_SIZE - BEVEL*2, BLOCK_SIZE - BEVEL*2, b.color);
       }
       sprite.pushSprite(x, y);
     }
@@ -505,8 +505,6 @@ class Tetris {
             if (deletable[i]) board.delete_rows_animated(i, 0, 9);
           }
           board.render();
-          // delay(50);
-
           board.fill_deleted_lines();
           board.render();
         }
