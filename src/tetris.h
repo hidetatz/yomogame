@@ -361,6 +361,14 @@ class Board {
       return block_placable_at(row1, col1) && block_placable_at(row2, col2) && block_placable_at(row3, col3) && block_placable_at(row4, col4);
     }
 
+
+    boolean mino_placable(Mino m) {
+      return block_placable_at(m.positions[0].row, m.positions[0].col) &&
+             block_placable_at(m.positions[1].row, m.positions[1].col) &&
+             block_placable_at(m.positions[2].row, m.positions[2].col) &&
+             block_placable_at(m.positions[3].row, m.positions[3].col);
+    }
+
     void place_mino(Mino m) {
       cur_mino = m;
     }
@@ -385,8 +393,8 @@ class Board {
       else if (dir == MoveDirection::LEFT) cur_mino->left(distance);
     }
 
-    void rotate(RotateDirection dir) {
-      if (cur_mino->is_O()) return; // o does not rotate
+    boolean rotate(RotateDirection dir) {
+      if (cur_mino->is_O()) return false; // o does not rotate
 
       // srs
       std::array<int, 8> base_pos = cur_mino->get_rotated_blocks_pos(dir);
@@ -403,9 +411,10 @@ class Board {
           else move_mino(MoveDirection::LEFT, -kick[0]);
           if (kick[1] > 0) move_mino(MoveDirection::UP, kick[1]);
           else move_mino(MoveDirection::DOWN, -kick[1]);
-          return;
+          return true;
         }
       }
+      return false;
     }
 
     boolean mino_landed() {
@@ -479,6 +488,9 @@ class Tetris {
     int board_grid_top_left_y;
     Board board;
 
+    unsigned long last_landed_at;
+    int lockdown_judge_reset_cnt;
+
     uint16_t bgcolor;
     TFT_eSPI &screen;
     TFT_eSprite board_sprite;
@@ -493,6 +505,8 @@ class Tetris {
         board_grid_top_left_x(board_grid_top_left_x),
         board_grid_top_left_y(board_grid_top_left_y),
         board(),
+        last_landed_at(0),
+        lockdown_judge_reset_cnt(0),
         bgcolor(bgcolor),
         screen(screen),
         board_sprite(&screen) {}
@@ -516,6 +530,27 @@ class Tetris {
       return next;
     }
 
+    boolean try_move(MoveDirection dir, int distance) {
+      if (!board.can_move_mino(dir, distance)) return false;
+      board.move_mino(dir, 1);
+      if (last_landed_at != 0) {
+        // because the mino moved, landed_at timer must be reset, but reset_cnt is counted
+        last_landed_at = 0;
+        lockdown_judge_reset_cnt++;
+      }
+      return true;
+    }
+
+    boolean try_rotate(RotateDirection dir) {
+      boolean rotated = board.rotate(dir);
+      if (rotated && last_landed_at != 0) {
+        // because the mino rotated, landed_at timer must be reset, but reset_cnt is counted
+        last_landed_at = 0;
+        lockdown_judge_reset_cnt++;
+      }
+      return rotated;
+    }
+
     void start() {
       board_sprite.createSprite(10 * block_size, 20 * block_size);
 
@@ -523,7 +558,6 @@ class Tetris {
 
       const int grid_width = block_size * 10 + 2;
       const int grid_height = block_size * 20 + 2;
-
       screen.drawFastHLine(board_grid_top_left_x,                  board_grid_top_left_y,                   grid_width,      TFT_WHITE); // top left to right
       screen.drawFastHLine(board_grid_top_left_x,                  board_grid_top_left_y + grid_height - 1, grid_width,      TFT_WHITE); // bottom left to right
       screen.drawFastVLine(board_grid_top_left_x,                  board_grid_top_left_y + 1,               grid_height - 2, TFT_WHITE); // top left to down
@@ -532,13 +566,12 @@ class Tetris {
       const int GRAVITY_MS = 1000;
       const int SOFT_DROP_MS = 50;
 
-      unsigned long gravity_tick = millis();
-      boolean was_down = false;
       boolean need_new_mino = true;
 
+      unsigned long gravity_tick = millis();
+      boolean was_down = false;
       boolean was_a = false;
       boolean was_b = false;
-
       boolean was_up = false;
 
       std::optional<MoveDirection> held_dir = std::nullopt;
@@ -597,7 +630,7 @@ class Tetris {
 
         if (need_new_mino) {
           Mino m = randomMino();
-          if (!board.blocks_placable(m.positions[0].row, m.positions[0].col, m.positions[1].row, m.positions[1].col, m.positions[2].row, m.positions[2].col, m.positions[3].row, m.positions[3].col)) {
+          if (!board.mino_placable(m)) {
             Serial.println("Game over");
             while (true) delay(1000);
           }
@@ -611,15 +644,11 @@ class Tetris {
         ButtonState btns = input.get();
         unsigned long now = millis();
 
+        // hard drop
         if (btns.UP && !was_up) {
           was_up = true;
           int i = 0;
-          while (board.can_move_mino(MoveDirection::DOWN, 1)) {
-            board.move_mino(MoveDirection::DOWN, 1);
-            if (landed != 0) {
-              landed = 0;
-              land_reset_cnt++;
-            }
+          while (try_move(MoveDirection::DOWN, 1)) {
             i++;
             if(i % 3 == 0) render();
           }
@@ -631,33 +660,21 @@ class Tetris {
         was_up = btns.UP;
 
         if (btns.A && !was_a) {
-          board.rotate(RotateDirection::CLOCKWISE);
+          try_rotate(RotateDirection::CLOCKWISE);
         } else if (btns.B && !was_b) {
-          board.rotate(RotateDirection::COUNTER_CLOCKWISE);
+          try_rotate(RotateDirection::COUNTER_CLOCKWISE);
         }
         was_a = btns.A;
         was_b = btns.B;
 
         if (btns.DOWN && !was_down) {
-          if (board.can_move_mino(MoveDirection::DOWN, 1)) {
-            board.move_mino(MoveDirection::DOWN, 1);
-            if (landed != 0) {
-              landed = 0;
-              land_reset_cnt++;
-            }
-          }
+          try_move(MoveDirection::DOWN, 1);
           gravity_tick = now;
         }
         was_down = btns.DOWN;
 
         if (now - gravity_tick >= (btns.DOWN ? SOFT_DROP_MS : GRAVITY_MS)) {
-          if (board.can_move_mino(MoveDirection::DOWN, 1)) {
-            board.move_mino(MoveDirection::DOWN, 1);
-            if (landed != 0) {
-              landed = 0;
-              land_reset_cnt++;
-            }
-          }
+          try_move(MoveDirection::DOWN, 1);
           gravity_tick = now;
         }
 
@@ -669,13 +686,7 @@ class Tetris {
           held_dir = dir;
           das_charged = false;
           if (dir.has_value()) {
-            if (board.can_move_mino(*dir, 1)) {
-              board.move_mino(*dir, 1);
-              if (landed != 0) {
-                landed = 0;
-                land_reset_cnt++;
-              }
-            }
+            try_move(*dir, 1);
             das_start = now;
           }
         } else if (dir.has_value()) {
@@ -683,41 +694,29 @@ class Tetris {
             if (now - das_start >= 300) {
               das_charged = true;
               last_repeat = now;
-              if (board.can_move_mino(*dir, 1)) {
-                board.move_mino(*dir, 1);
-                if (landed != 0) {
-                  landed = 0;
-                  land_reset_cnt++;
-                }
-              }
+              try_move(*dir, 1);
             }
           } else {
             if (now - last_repeat >= 50) {
               last_repeat += 50;
-              if (board.can_move_mino(*dir, 1)) {
-                board.move_mino(*dir, 1);
-                if (landed != 0) {
-                  landed = 0;
-                  land_reset_cnt++;
-                }
-              }
+              try_move(*dir, 1);
             }
           }
         }
 
         if (board.mino_landed()) {
-          if (landed == 0) {
-            landed = millis();
+          if (last_landed_at == 0) {
+            last_landed_at = millis();
           }
-          if (now - landed >= 500 || land_reset_cnt >= 15) {
+          if (now - last_landed_at >= 500 || lockdown_judge_reset_cnt >= 15) {
             board.fix_mino();
             need_new_mino = true;
-            landed = 0;
-            land_reset_cnt = 0;
+            last_landed_at = 0;
+            lockdown_judge_reset_cnt = 0;
           }
         } else {
-          landed = 0;
-          land_reset_cnt = 0;
+          last_landed_at = 0;
+          lockdown_judge_reset_cnt = 0;
         }
 
         render();
