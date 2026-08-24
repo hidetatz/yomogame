@@ -11,36 +11,13 @@
 
 #define LOGF(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
 
-constexpr uint16_t lighten(uint16_t color, float amount) {
-  uint8_t r = (color >> 11) & 0x1F;
-  uint8_t g = (color >> 5) & 0x3F;
-  uint8_t b = (color) & 0x1F;
-  r += (31 - r) * amount;
-  g += (63 - g) * amount;
-  b += (31 - b) * amount;
-  return (r << 11) | (g << 5) | b;
-}
-
-constexpr uint16_t darken(uint16_t color, float amount) {
-  uint8_t r = (color >> 11) & 0x1F;
-  uint8_t g = (color >> 5) & 0x3F;
-  uint8_t b = (color) & 0x1F;
-  r *= (1.0 - amount);
-  g *= (1.0 - amount);
-  b *= (1.0 - amount);
-  return (r << 11) | (g << 5) | b;
-}
-
 // color of block in tetrimino
 class BlockColor {
   public:
     uint16_t base;
     uint16_t lighter;
     uint16_t darker;
-    BlockColor(uint16_t base) : base(base) {
-      lighter = lighten(base, 0.4);
-      darker = darken(base, 0.4);
-    }
+    BlockColor(uint16_t base, uint16_t lighter, uint16_t darker) : base(base), lighter(lighter), darker(darker) {}
 };
 
 // block position in a board
@@ -83,34 +60,34 @@ class Mino {
     Pivot pivot;
     MinoDirection cur_direction;
 
-    Mino(char kind, uint16_t base_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color(base_color), positions(positions), pivot(pivot), kind(kind), cur_direction(direction) {}
+    Mino(char kind, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color(base_color, lighter_color, darker_color), positions(positions), pivot(pivot), kind(kind), cur_direction(direction) {}
 
     static Mino O(int row, int col) {
-      return Mino('O', TFT_YELLOW, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(0, 0), MinoDirection::NORTH);
+      return Mino('O', 63456, 63468, 38048, /* yellow */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(0, 0), MinoDirection::NORTH);
     }
 
     static Mino I(int row, int col) {
-        return Mino('I', TFT_SKYBLUE, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row, col+3)}}, Pivot(row+0.5, col+1.5), MinoDirection::NORTH);
+        return Mino('I', 1694, 26398, 1010, /* sky blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row, col+3)}}, Pivot(row+0.5, col+1.5), MinoDirection::NORTH);
     }
 
     static Mino T(int row, int col) {
-        return Mino('T', TFT_PURPLE, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
+        return Mino('T', 40989, 49981, 24593, /* purple */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
     }
 
     static Mino L(int row, int col) {
-        return Mino('L', TFT_ORANGE, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
+        return Mino('L', 62242, 62733, 37345, /* orange */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
     }
 
     static Mino J(int row, int col) {
-        return Mino('J', TFT_DARKCYAN, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col)}}, Pivot(row, col+1), MinoDirection::NORTH);
+        return Mino('J', 8254, 29502, 4114, /* blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col)}}, Pivot(row, col+1), MinoDirection::NORTH);
     }
 
     static Mino S(int row, int col) {
-        return Mino('S', TFT_GREEN, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col+1), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
+        return Mino('S', 6049, 28589, 3200, /* green */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col+1), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
     }
 
     static Mino Z(int row, int col) {
-        return Mino('Z', TFT_RED, {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col-1)}}, Pivot(row, col), MinoDirection::NORTH);
+        return Mino('Z', 63521, 64301, 36864, /* red */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col-1)}}, Pivot(row, col), MinoDirection::NORTH);
     }
 
     void up(int distance) {
@@ -543,6 +520,9 @@ class YomoTetris_240x240 {
       screen.drawFastHLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + next_minos_grid_height - 1, next_minos_grid_width,      TFT_WHITE); // bottom left to right
       screen.drawFastVLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top left to down
       screen.drawFastVLine(next_minos_grid_top_left_x + next_minos_grid_width - 1, next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top right to down
+      screen.setTextColor(TFT_WHITE, bgcolor);
+      screen.setTextDatum(TC_DATUM);
+      screen.drawString("NEXT", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
 
       const int FREE_FALL_MS = 1000;
 
