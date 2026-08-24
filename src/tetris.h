@@ -563,21 +563,20 @@ class Tetris {
       screen.drawFastVLine(board_grid_top_left_x,                  board_grid_top_left_y + 1,               grid_height - 2, TFT_WHITE); // top left to down
       screen.drawFastVLine(board_grid_top_left_x + grid_width - 1, board_grid_top_left_y + 1,               grid_height - 2, TFT_WHITE); // top right to down
 
-      const int GRAVITY_MS = 1000;
-      const int SOFT_DROP_MS = 50;
+      const int FREE_FALL_MS = 1000;
 
-      unsigned long gravity_tick = millis();
+      unsigned long free_fall_timer = millis();
+      unsigned long last_soft_dropped = millis();
+
+      boolean was_up = false;
       boolean was_down = false;
       boolean was_a = false;
       boolean was_b = false;
-      boolean was_up = false;
 
       std::optional<MoveDirection> held_dir = std::nullopt;
       unsigned long das_start = 0;
       boolean das_charged = false;
       unsigned long last_repeat = 0;
-      unsigned long landed = 0;
-      int land_reset_cnt = 0;
 
       while (true) {
         // delete rows with animation
@@ -634,7 +633,7 @@ class Tetris {
           }
           board.place_mino(m);
           render();
-          gravity_tick = millis();
+          free_fall_timer = millis();
           continue;
         }
 
@@ -655,6 +654,7 @@ class Tetris {
         }
         was_up = btns.UP;
 
+        // rotation
         if (btns.A && !was_a) {
           try_rotate(RotateDirection::CLOCKWISE);
         } else if (btns.B && !was_b) {
@@ -663,15 +663,25 @@ class Tetris {
         was_a = btns.A;
         was_b = btns.B;
 
-        if (btns.DOWN && !was_down) {
-          try_move(MoveDirection::DOWN, 1);
-          gravity_tick = now;
+        // softdrop
+        if (btns.DOWN) {
+          // when DOWN button press held, soft drop needs some interval
+          boolean soft_drop_interval_passed = (now - last_soft_dropped) >= FREE_FALL_MS / 20;
+
+          // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
+          if (!was_down || soft_drop_interval_passed) {
+            try_move(MoveDirection::DOWN, 1);
+            last_soft_dropped = now;
+            // on soft drop, free fall timer is reset
+            free_fall_timer = now;
+          }
         }
         was_down = btns.DOWN;
 
-        if (now - gravity_tick >= (btns.DOWN ? SOFT_DROP_MS : GRAVITY_MS)) {
+        // free fall
+        if (now - free_fall_timer >= FREE_FALL_MS) {
           try_move(MoveDirection::DOWN, 1);
-          gravity_tick = now;
+          free_fall_timer = now;
         }
 
         std::optional<MoveDirection> dir = std::nullopt;
