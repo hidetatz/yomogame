@@ -532,7 +532,7 @@ class Tetris {
 
     boolean try_move(MoveDirection dir, int distance) {
       if (!board.can_move_mino(dir, distance)) return false;
-      board.move_mino(dir, 1);
+      board.move_mino(dir, distance);
       if (last_landed_at != 0) {
         // because the mino moved, landed_at timer must be reset, but reset_cnt is counted
         last_landed_at = 0;
