@@ -472,6 +472,11 @@ class Board {
           write_row--;
         }
       }
+      for (int row = write_row; row >= 0; row--) {
+        for (int col = 0; col < 10; col++) {
+          delete_block(row, col);
+        }
+      }
     }
 };
 
