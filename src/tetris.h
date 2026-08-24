@@ -564,19 +564,20 @@ class Tetris {
       screen.drawFastVLine(board_grid_top_left_x + grid_width - 1, board_grid_top_left_y + 1,               grid_height - 2, TFT_WHITE); // top right to down
 
       const int FREE_FALL_MS = 1000;
+      const int HORIZONTAL_MOVE_FIRST_WAIT_MS = 300;
+      const int HORIZONTAL_MOVE_AUTO_REPEATING_WAIT_MS = 50;
 
       unsigned long free_fall_timer = millis();
       unsigned long last_soft_dropped = millis();
+      unsigned long last_horizontally_moved = millis();
+      boolean horizontal_auto_repeat_started = false;
 
       boolean was_up = false;
       boolean was_down = false;
       boolean was_a = false;
       boolean was_b = false;
-
-      std::optional<MoveDirection> held_dir = std::nullopt;
-      unsigned long das_start = 0;
-      boolean das_charged = false;
-      unsigned long last_repeat = 0;
+      boolean was_right = false;
+      boolean was_left = false;
 
       while (true) {
         // delete rows with animation
@@ -625,6 +626,7 @@ class Tetris {
           render();
         }
 
+        // new mino pop
         if (!board.cur_mino_exists()) {
           Mino m = randomMino();
           if (!board.mino_placable(m)) {
@@ -684,31 +686,37 @@ class Tetris {
           free_fall_timer = now;
         }
 
-        std::optional<MoveDirection> dir = std::nullopt;
-        if (btns.RIGHT && !btns.LEFT) dir = MoveDirection::RIGHT;
-        else if (btns.LEFT && !btns.RIGHT) dir = MoveDirection::LEFT;
+        // horizontal move
+        if (btns.RIGHT || btns.LEFT) {
+          MoveDirection dir = btns.RIGHT ? MoveDirection::RIGHT : MoveDirection::LEFT;
 
-        if (dir != held_dir) {
-          held_dir = dir;
-          das_charged = false;
-          if (dir.has_value()) {
-            try_move(*dir, 1);
-            das_start = now;
-          }
-        } else if (dir.has_value()) {
-          if (!das_charged) {
-            if (now - das_start >= 300) {
-              das_charged = true;
-              last_repeat = now;
-              try_move(*dir, 1);
-            }
+          if (btns.RIGHT && btns.LEFT) {
+            // on both pressed, do nothing
+
+          } else if ((btns.RIGHT && !was_right) || (btns.LEFT && !was_left)) {
+            // when horizontal press changed, just move
+            try_move(dir, 1);
+            last_horizontally_moved = now;
+            horizontal_auto_repeat_started = false;
+
           } else {
-            if (now - last_repeat >= 50) {
-              last_repeat += 50;
-              try_move(*dir, 1);
+            // when press held, move after some interval
+            if (!horizontal_auto_repeat_started) {
+              if (now - last_horizontally_moved >= HORIZONTAL_MOVE_FIRST_WAIT_MS) {
+                try_move(dir, 1);
+                last_horizontally_moved = now;
+                horizontal_auto_repeat_started = true;
+              }
+            } else {
+              if (now - last_horizontally_moved >= HORIZONTAL_MOVE_AUTO_REPEATING_WAIT_MS) {
+                try_move(dir, 1);
+                last_horizontally_moved = now;
+              }
             }
           }
         }
+        was_right = btns.RIGHT;
+        was_left = btns.LEFT;
 
         if (board.mino_landed()) {
           if (last_landed_at == 0) {
