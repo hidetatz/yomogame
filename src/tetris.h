@@ -566,8 +566,6 @@ class Tetris {
       const int GRAVITY_MS = 1000;
       const int SOFT_DROP_MS = 50;
 
-      boolean need_new_mino = true;
-
       unsigned long gravity_tick = millis();
       boolean was_down = false;
       boolean was_a = false;
@@ -628,14 +626,13 @@ class Tetris {
           render();
         }
 
-        if (need_new_mino) {
+        if (!board.cur_mino_exists()) {
           Mino m = randomMino();
           if (!board.mino_placable(m)) {
             Serial.println("Game over");
             while (true) delay(1000);
           }
           board.place_mino(m);
-          need_new_mino = false;
           render();
           gravity_tick = millis();
           continue;
@@ -654,7 +651,6 @@ class Tetris {
           }
           render();
           board.fix_mino();
-          need_new_mino = true;
           continue;
         }
         was_up = btns.UP;
@@ -710,7 +706,6 @@ class Tetris {
           }
           if (now - last_landed_at >= 500 || lockdown_judge_reset_cnt >= 15) {
             board.fix_mino();
-            need_new_mino = true;
             last_landed_at = 0;
             lockdown_judge_reset_cnt = 0;
           }
