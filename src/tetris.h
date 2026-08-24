@@ -488,8 +488,11 @@ class Tetris {
     int board_grid_top_left_y;
     Board board;
 
-    unsigned long last_landed_at;
-    int lockdown_judge_reset_cnt;
+    unsigned long last_moved_at;
+    unsigned long last_horizontally_moved_at;
+    unsigned long free_fall_timer;
+    boolean lockdown_judging;
+    int move_cnt_while_lockdown_judging;
 
     uint16_t bgcolor;
     TFT_eSPI &screen;
@@ -505,8 +508,11 @@ class Tetris {
         board_grid_top_left_x(board_grid_top_left_x),
         board_grid_top_left_y(board_grid_top_left_y),
         board(),
-        last_landed_at(0),
-        lockdown_judge_reset_cnt(0),
+        last_moved_at(0),
+        last_horizontally_moved_at(0),
+        free_fall_timer(0),
+        lockdown_judging(false),
+        move_cnt_while_lockdown_judging(0),
         bgcolor(bgcolor),
         screen(screen),
         board_sprite(&screen) {}
@@ -530,25 +536,28 @@ class Tetris {
       return next;
     }
 
-    boolean try_move(MoveDirection dir, int distance) {
+    boolean try_move(MoveDirection dir, int distance, unsigned long now) {
       if (!board.can_move_mino(dir, distance)) return false;
       board.move_mino(dir, distance);
-      if (last_landed_at != 0) {
-        // because the mino moved, landed_at timer must be reset, but reset_cnt is counted
-        last_landed_at = 0;
-        lockdown_judge_reset_cnt++;
+      if (lockdown_judging) {
+        move_cnt_while_lockdown_judging++;
       }
+      if (dir == MoveDirection::RIGHT || dir == MoveDirection::LEFT) {
+        last_horizontally_moved_at = now;
+      }
+      if (dir == MoveDirection::DOWN) {
+        free_fall_timer = now;
+      }
+      last_moved_at = now;
       return true;
     }
 
-    boolean try_rotate(RotateDirection dir) {
+    boolean try_rotate(RotateDirection dir, unsigned long now) {
       boolean rotated = board.rotate(dir);
-      if (rotated && last_landed_at != 0) {
-        // because the mino rotated, landed_at timer must be reset, but reset_cnt is counted
-        last_landed_at = 0;
-        lockdown_judge_reset_cnt++;
-      }
-      return rotated;
+      if (!rotated) return false;
+      if (lockdown_judging) move_cnt_while_lockdown_judging++;
+      last_moved_at = now;
+      return true;
     }
 
     void start() {
@@ -566,10 +575,10 @@ class Tetris {
       const int FREE_FALL_MS = 1000;
       const int HORIZONTAL_MOVE_FIRST_WAIT_MS = 300;
       const int HORIZONTAL_MOVE_AUTO_REPEATING_WAIT_MS = 50;
+      const int LOCKDOWN_WAIT_MS = 500;
+      const int LOCKDOWN_RESET_MOVE_LIMIT = 15;
 
-      unsigned long free_fall_timer = millis();
-      unsigned long last_soft_dropped = millis();
-      unsigned long last_horizontally_moved = millis();
+      unsigned long last_soft_dropped = 0;
       boolean horizontal_auto_repeat_started = false;
 
       boolean was_up = false;
@@ -626,6 +635,8 @@ class Tetris {
           render();
         }
 
+        unsigned long now = millis();
+
         // new mino pop
         if (!board.cur_mino_exists()) {
           Mino m = randomMino();
@@ -635,18 +646,20 @@ class Tetris {
           }
           board.place_mino(m);
           render();
-          free_fall_timer = millis();
+          free_fall_timer = now;
+          last_moved_at = now;
+          lockdown_judging = false;
+          move_cnt_while_lockdown_judging = 0;
           continue;
         }
 
         ButtonState btns = input.get();
-        unsigned long now = millis();
 
         // hard drop
         if (btns.UP && !was_up) {
           was_up = true;
           int i = 0;
-          while (try_move(MoveDirection::DOWN, 1)) {
+          while (try_move(MoveDirection::DOWN, 1, now)) {
             i++;
             if(i % 3 == 0) render();
           }
@@ -658,9 +671,9 @@ class Tetris {
 
         // rotation
         if (btns.A && !was_a) {
-          try_rotate(RotateDirection::CLOCKWISE);
+          try_rotate(RotateDirection::CLOCKWISE, now);
         } else if (btns.B && !was_b) {
-          try_rotate(RotateDirection::COUNTER_CLOCKWISE);
+          try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
         }
         was_a = btns.A;
         was_b = btns.B;
@@ -672,18 +685,15 @@ class Tetris {
 
           // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
           if (!was_down || soft_drop_interval_passed) {
-            try_move(MoveDirection::DOWN, 1);
+            try_move(MoveDirection::DOWN, 1, now);
             last_soft_dropped = now;
-            // on soft drop, free fall timer is reset
-            free_fall_timer = now;
           }
         }
         was_down = btns.DOWN;
 
         // free fall
         if (now - free_fall_timer >= FREE_FALL_MS) {
-          try_move(MoveDirection::DOWN, 1);
-          free_fall_timer = now;
+          try_move(MoveDirection::DOWN, 1, now);
         }
 
         // horizontal move
@@ -695,22 +705,19 @@ class Tetris {
 
           } else if ((btns.RIGHT && !was_right) || (btns.LEFT && !was_left)) {
             // when horizontal press changed, just move
-            try_move(dir, 1);
-            last_horizontally_moved = now;
+            try_move(dir, 1, now);
             horizontal_auto_repeat_started = false;
 
           } else {
             // when press held, move after some interval
             if (!horizontal_auto_repeat_started) {
-              if (now - last_horizontally_moved >= HORIZONTAL_MOVE_FIRST_WAIT_MS) {
-                try_move(dir, 1);
-                last_horizontally_moved = now;
+              if (now - last_horizontally_moved_at >= HORIZONTAL_MOVE_FIRST_WAIT_MS) {
+                try_move(dir, 1, now);
                 horizontal_auto_repeat_started = true;
               }
             } else {
-              if (now - last_horizontally_moved >= HORIZONTAL_MOVE_AUTO_REPEATING_WAIT_MS) {
-                try_move(dir, 1);
-                last_horizontally_moved = now;
+              if (now - last_horizontally_moved_at >= HORIZONTAL_MOVE_AUTO_REPEATING_WAIT_MS) {
+                try_move(dir, 1, now);
               }
             }
           }
@@ -719,17 +726,15 @@ class Tetris {
         was_left = btns.LEFT;
 
         if (board.mino_landed()) {
-          if (last_landed_at == 0) {
-            last_landed_at = millis();
-          }
-          if (now - last_landed_at >= 500 || lockdown_judge_reset_cnt >= 15) {
+          if (!lockdown_judging) lockdown_judging = true;
+          if (now - last_moved_at >= LOCKDOWN_WAIT_MS || move_cnt_while_lockdown_judging >= LOCKDOWN_RESET_MOVE_LIMIT) {
             board.fix_mino();
-            last_landed_at = 0;
-            lockdown_judge_reset_cnt = 0;
+            lockdown_judging = false;
+            move_cnt_while_lockdown_judging = 0;
           }
         } else {
-          last_landed_at = 0;
-          lockdown_judge_reset_cnt = 0;
+          lockdown_judging = false;
+          move_cnt_while_lockdown_judging = 0;
         }
 
         render();
