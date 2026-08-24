@@ -3,7 +3,7 @@
 #include <optional>
 #include <Arduino.h>
 #include <SPI.h>
-#include <TFT_eSPI.h> 
+#include <TFT_eSPI.h>
 
 #define LOGF(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
 
@@ -70,7 +70,7 @@ class Input {
    int pinLEFT;
 
   public:
-    Input(int pinA, int pinB, int pinSTART, int pinSELECT, int pinRIGHT, int pinUP, int pinDOWN, int pinLEFT) : 
+    Input(int pinA, int pinB, int pinSTART, int pinSELECT, int pinRIGHT, int pinUP, int pinDOWN, int pinLEFT) :
       pinA(pinA), pinB(pinB), pinSTART(pinSTART), pinSELECT(pinSELECT), pinRIGHT(pinRIGHT), pinUP(pinUP), pinDOWN(pinDOWN), pinLEFT(pinLEFT) {
         pinMode(pinA, INPUT_PULLUP);
         pinMode(pinB, INPUT_PULLUP);
@@ -356,7 +356,7 @@ class Board {
     }
 
     boolean blocks_placable(int row1, int col1, int row2, int col2, int row3, int col3, int row4, int col4) {
-      return block_placable_at(row1, col1) && block_placable_at(row2, col2) && block_placable_at(row3, col3) && block_placable_at(row4, col4); 
+      return block_placable_at(row1, col1) && block_placable_at(row2, col2) && block_placable_at(row3, col3) && block_placable_at(row4, col4);
     }
 
     void place_mino(Mino m) {
@@ -485,9 +485,9 @@ class Tetris {
     TFT_eSprite board_sprite;
 
   public:
-    Tetris(Input input, int block_size, int bevel, int board_grid_top_left_x, int board_grid_top_left_y, uint16_t bgcolor, TFT_eSPI &screen) 
-      : input(input), 
-        bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)}, 
+    Tetris(Input input, int block_size, int bevel, int board_grid_top_left_x, int board_grid_top_left_y, uint16_t bgcolor, TFT_eSPI &screen)
+      : input(input),
+        bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)},
         mino_idx(0),
         block_size(block_size),
         bevel(bevel),
