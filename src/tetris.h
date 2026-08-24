@@ -1,6 +1,8 @@
 #pragma once
 #include <array>
 #include <optional>
+#include <tuple>
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -432,17 +434,14 @@ class Board {
       return true;
     }
 
-    boolean deletable_rows_exists() {
-      for (int row = 0; row < 20; row++) {
-        if (is_full_row(row)) return true;
-      }
-      return false;
-    }
-
-    std::array<boolean, 20> deletable_rows() {
+    std::tuple<boolean, std::array<boolean, 20>> deletable_rows() {
+      boolean exists = false;
       std::array<boolean, 20> result = {};
-      for (int row = 0; row < 20; row++) result[row] = is_full_row(row);
-      return result;
+      for (int row = 0; row < 20; row++) {
+        result[row] = is_full_row(row);
+        if (result[row]) exists = true;
+      }
+      return {exists, result};
     }
 
     void delete_block(int row, int col) {
@@ -550,9 +549,9 @@ class Tetris {
       int land_reset_cnt = 0;
 
       while (true) {
-        boolean deletable_rows_exists = board.deletable_rows_exists();
+        // delete rows with animation
+        auto [deletable_rows_exists, deletable] = board.deletable_rows();
         if (deletable_rows_exists) {
-          std::array<boolean, 20> deletable = board.deletable_rows();
           for (int i = 0; i < 20; i++) {
             if (deletable[i]) {
               board.delete_block(i, 4);
