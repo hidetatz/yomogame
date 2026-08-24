@@ -45,13 +45,12 @@ void setup() {
 
   Input input = Input(btnA, btnB, btnS, btnE, btnR, btnU, btnD, btnL);
 
-  Tetris tetris = Tetris(input, 11, 2, 64, 9, 180, 18, TFT_BLACK, screen);
+  YomoTetris_240x240 tetris = YomoTetris_240x240(input, screen);
   tetris.start();
 }
 
 void loop() {
   while (true) delay(100);
-  // tetris.start();
 }
 
   // // audio setting

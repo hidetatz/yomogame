@@ -413,20 +413,29 @@ class Board {
     }
 };
 
-class Tetris {
-  private:
-    Input input;
+const int block_size = 11;
+const int bevel = 2;
+const int board_grid_top_left_x = 64;
+const int board_grid_top_left_y = 9;
+const int next_minos_grid_top_left_x = 180;
+const int next_minos_grid_top_left_y = 27;
+const int next_minos_left_margin = 5;
+const int next_minos_right_margin = 5;
+const int next_minos_top_margin = 10;
+const int next_minos_bottom_margin = 10;
+const int next_minos_between_margin = 10;
 
+const int horizontal_move_first_wait_ms = 300;
+const int horizontal_move_auto_repeating_wait_ms = 50;
+const int lockdown_wait_ms = 500;
+const int lockdown_reset_move_limit = 15;
+
+class YomoTetris_240x240 {
+  public:
     std::array<Mino, 7> cur_bag;
     std::array<Mino, 7> next_bag;
     int mino_idx;
 
-    int block_size;
-    int bevel;
-    int board_grid_top_left_x;
-    int board_grid_top_left_y;
-    int next_minos_grid_top_left_x;
-    int next_minos_grid_top_left_y;
     Board board;
 
     unsigned long last_moved_at;
@@ -435,36 +444,35 @@ class Tetris {
     boolean lockdown_judging;
     int move_cnt_while_lockdown_judging;
 
+    Input input;
     uint16_t bgcolor;
     TFT_eSPI &screen;
     TFT_eSprite board_sprite;
     std::array<TFT_eSprite, 6> next_minos_sprites;
 
   public:
-    Tetris(Input input, int block_size, int bevel, int board_grid_top_left_x, int board_grid_top_left_y, int next_minos_grid_top_left_x, int next_minos_grid_top_left_y, uint16_t bgcolor, TFT_eSPI &screen)
-      : input(input),
-        cur_bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)},
-        next_bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)},
-        mino_idx(0),
-        block_size(block_size),
-        bevel(bevel),
-        board_grid_top_left_x(board_grid_top_left_x),
-        board_grid_top_left_y(board_grid_top_left_y),
-        next_minos_grid_top_left_x(next_minos_grid_top_left_x),
-        next_minos_grid_top_left_y(next_minos_grid_top_left_y),
-        board(),
-        last_moved_at(0),
-        last_horizontally_moved_at(0),
-        free_fall_timer(0),
-        lockdown_judging(false),
-        move_cnt_while_lockdown_judging(0),
-        bgcolor(bgcolor),
-        screen(screen),
-        board_sprite(&screen),
-        next_minos_sprites{TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen)} {
-          shuffle_bag(cur_bag);
-          shuffle_bag(next_bag);
-        }
+    YomoTetris_240x240(Input input, TFT_eSPI &screen) :
+      cur_bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)},
+      next_bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)},
+      mino_idx(0),
+
+      board(),
+
+      last_moved_at(0),
+      last_horizontally_moved_at(0),
+      free_fall_timer(0),
+      lockdown_judging(false),
+      move_cnt_while_lockdown_judging(0),
+
+      input(input),
+      bgcolor(TFT_BLACK),
+      screen(screen),
+      board_sprite(&screen),
+      next_minos_sprites{TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen)}
+      {
+        shuffle_bag(cur_bag);
+        shuffle_bag(next_bag);
+      }
 
     void shuffle_bag(std::array<Mino, 7>& bag) {
       for (int i = 0; i < 7; i++) {
@@ -519,8 +527,9 @@ class Tetris {
     void start() {
       /* board area */
       board_sprite.createSprite(10 * block_size, 20 * block_size);
-      const int board_grid_width = block_size * 10 + 2;
-      const int board_grid_height = block_size * 20 + 2;
+      // 1 is line itself
+      const int board_grid_width = 1 + block_size * 10 + 1;
+      const int board_grid_height = 1 + block_size * 20 + 1;
       screen.drawFastHLine(board_grid_top_left_x,                        board_grid_top_left_y,                         board_grid_width,      TFT_WHITE); // top left to right
       screen.drawFastHLine(board_grid_top_left_x,                        board_grid_top_left_y + board_grid_height - 1, board_grid_width,      TFT_WHITE); // bottom left to right
       screen.drawFastVLine(board_grid_top_left_x,                        board_grid_top_left_y + 1,                     board_grid_height - 2, TFT_WHITE); // top left to down
@@ -528,18 +537,14 @@ class Tetris {
 
       /* next_minos area */
       for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(block_size * 4, block_size * 2);
-      const int next_minos_grid_width = block_size * 4 + 10 + 2;
-      const int next_minos_grid_height = block_size * 2 * 6 + 10 * 7 + 2; // 10 is top/bottom margin and minos padding
+      const int next_minos_grid_width = 1 + next_minos_left_margin + block_size * 4 + next_minos_right_margin + 1;
+      const int next_minos_grid_height = 1 + next_minos_top_margin + block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 1;
       screen.drawFastHLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y,                              next_minos_grid_width,      TFT_WHITE); // top left to right
       screen.drawFastHLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + next_minos_grid_height - 1, next_minos_grid_width,      TFT_WHITE); // bottom left to right
       screen.drawFastVLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top left to down
       screen.drawFastVLine(next_minos_grid_top_left_x + next_minos_grid_width - 1, next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top right to down
 
       const int FREE_FALL_MS = 1000;
-      const int HORIZONTAL_MOVE_FIRST_WAIT_MS = 300;
-      const int HORIZONTAL_MOVE_AUTO_REPEATING_WAIT_MS = 50;
-      const int LOCKDOWN_WAIT_MS = 500;
-      const int LOCKDOWN_RESET_MOVE_LIMIT = 15;
 
       unsigned long last_soft_dropped = 0;
       boolean horizontal_auto_repeat_started = false;
@@ -674,12 +679,12 @@ class Tetris {
           } else {
             // when press held, move after some interval
             if (!horizontal_auto_repeat_started) {
-              if (now - last_horizontally_moved_at >= HORIZONTAL_MOVE_FIRST_WAIT_MS) {
+              if (now - last_horizontally_moved_at >= horizontal_move_first_wait_ms) {
                 try_move(dir, 1, now);
                 horizontal_auto_repeat_started = true;
               }
             } else {
-              if (now - last_horizontally_moved_at >= HORIZONTAL_MOVE_AUTO_REPEATING_WAIT_MS) {
+              if (now - last_horizontally_moved_at >= horizontal_move_auto_repeating_wait_ms) {
                 try_move(dir, 1, now);
               }
             }
@@ -690,7 +695,7 @@ class Tetris {
 
         if (board.mino_landed()) {
           if (!lockdown_judging) lockdown_judging = true;
-          if (now - last_moved_at >= LOCKDOWN_WAIT_MS || move_cnt_while_lockdown_judging >= LOCKDOWN_RESET_MOVE_LIMIT) {
+          if (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit) {
             board.fix_mino();
             lockdown_judging = false;
             move_cnt_while_lockdown_judging = 0;
@@ -741,6 +746,7 @@ class Tetris {
 
       board_sprite.pushSprite(board_grid_top_left_x+1, board_grid_top_left_y+1);
 
+      // next minos
       for (int s = 0; s < 6; s++) {
         next_minos_sprites[s].fillSprite(bgcolor);
         char t = next_mino_type(s);
@@ -760,7 +766,7 @@ class Tetris {
           next_minos_sprites[s].fillRect(x + b.col * block_size, y + b.row * block_size, block_size - bevel, block_size - bevel, m.color.lighter);
           next_minos_sprites[s].fillRect(x + b.col * block_size + bevel, y + b.row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, m.color.base);
         }
-        next_minos_sprites[s].pushSprite(next_minos_grid_top_left_x+1+5, next_minos_grid_top_left_y+1+10+32*(s));
+        next_minos_sprites[s].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (block_size * 2 + next_minos_between_margin) * s);
       }
     }
 };
