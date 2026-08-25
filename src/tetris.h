@@ -52,42 +52,32 @@ class Pivot {
     void left(int distance) { col -= distance; }
 };
 
+enum class MinoType {
+  O, I, T, L, J, S, Z
+};
+
 class Mino {
   public:
-    char kind;
+    MinoType type;
     BlockColor color;
     std::array<BlockPos, 4> positions;
     Pivot pivot;
     MinoDirection cur_direction;
 
-    Mino(char kind, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color(base_color, lighter_color, darker_color), positions(positions), pivot(pivot), kind(kind), cur_direction(direction) {}
+    Mino(MinoType type, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color(base_color, lighter_color, darker_color), positions(positions), pivot(pivot), type(type), cur_direction(direction) {}
 
-    static Mino O(int row, int col) {
-      return Mino('O', 63456, 63468, 38048, /* yellow */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(0, 0), MinoDirection::NORTH);
+    static Mino from_type(MinoType type) {
+      return Mino::from_type_row_col(type, 0, type == MinoType::O || type == MinoType::Z ? 4 : 3);
     }
 
-    static Mino I(int row, int col) {
-        return Mino('I', 1694, 26398, 1010, /* sky blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row, col+3)}}, Pivot(row+0.5, col+1.5), MinoDirection::NORTH);
-    }
-
-    static Mino T(int row, int col) {
-        return Mino('T', 40989, 49981, 24593, /* purple */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
-    }
-
-    static Mino L(int row, int col) {
-        return Mino('L', 62242, 62733, 37345, /* orange */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
-    }
-
-    static Mino J(int row, int col) {
-        return Mino('J', 8254, 29502, 4114, /* blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col)}}, Pivot(row, col+1), MinoDirection::NORTH);
-    }
-
-    static Mino S(int row, int col) {
-        return Mino('S', 6049, 28589, 3200, /* green */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col+1), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
-    }
-
-    static Mino Z(int row, int col) {
-        return Mino('Z', 63521, 64301, 36864, /* red */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col-1)}}, Pivot(row, col), MinoDirection::NORTH);
+    static Mino from_type_row_col(MinoType type, int row, int col) {
+      if (type == MinoType::O) return Mino(type, 63456, 63468, 38048, /* yellow */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(0, 0), MinoDirection::NORTH);
+      if (type == MinoType::I) return Mino(type, 1694, 26398, 1010, /* sky blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row, col+3)}}, Pivot(row+0.5, col+1.5), MinoDirection::NORTH);
+      if (type == MinoType::T) return Mino(type, 40989, 49981, 24593, /* purple */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
+      if (type == MinoType::L) return Mino(type, 62242, 62733, 37345, /* orange */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
+      if (type == MinoType::J) return Mino(type, 8254, 29502, 4114, /* blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col)}}, Pivot(row, col+1), MinoDirection::NORTH);
+      if (type == MinoType::S) return Mino(type, 6049, 28589, 3200, /* green */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col+1), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
+      /* if (type == MinoType::Z) */ return Mino(type, 63521, 64301, 36864, /* red */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col-1)}}, Pivot(row, col), MinoDirection::NORTH);
     }
 
     void up(int distance) {
@@ -111,11 +101,11 @@ class Mino {
     }
 
     boolean is_O() {
-      return kind == 'O';
+      return type == MinoType::O;
     }
 
     boolean is_I() {
-      return kind == 'I';
+      return type == MinoType::I;
     }
 
     std::array<int, 8> get_rotated_blocks_pos(RotateDirection dir) {
@@ -392,8 +382,10 @@ class Board {
 
 const int block_size = 11;
 const int bevel = 2;
+
 const int board_grid_top_left_x = 64;
 const int board_grid_top_left_y = 9;
+
 const int next_minos_grid_top_left_x = 180;
 const int next_minos_grid_top_left_y = 27;
 const int next_minos_left_margin = 5;
@@ -402,6 +394,14 @@ const int next_minos_top_margin = 10;
 const int next_minos_bottom_margin = 10;
 const int next_minos_between_margin = 10;
 
+const int hold_block_size = 8;
+const int hold_grid_top_left_x = 11;
+const int hold_grid_top_left_y = 27;
+const int hold_left_margin = 4;
+const int hold_right_margin = 4;
+const int hold_top_margin = 4;
+const int hold_bottom_margin = 4;
+
 const int horizontal_move_first_wait_ms = 300;
 const int horizontal_move_auto_repeating_wait_ms = 50;
 const int lockdown_wait_ms = 500;
@@ -409,11 +409,13 @@ const int lockdown_reset_move_limit = 15;
 
 class YomoTetris_240x240 {
   public:
-    std::array<Mino, 7> cur_bag;
-    std::array<Mino, 7> next_bag;
+    std::array<MinoType, 7> cur_bag;
+    std::array<MinoType, 7> next_bag;
     int mino_idx;
 
     Board board;
+
+    std::optional<Mino> hold_mino;
 
     unsigned long last_moved_at;
     unsigned long last_horizontally_moved_at;
@@ -426,11 +428,12 @@ class YomoTetris_240x240 {
     TFT_eSPI &screen;
     TFT_eSprite board_sprite;
     std::array<TFT_eSprite, 6> next_minos_sprites;
+    TFT_eSprite hold_sprite;
 
   public:
     YomoTetris_240x240(Input input, TFT_eSPI &screen) :
-      cur_bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)},
-      next_bag{Mino::L(0, 3), Mino::J(0, 3), Mino::I(0, 3), Mino::O(0, 4), Mino::S(0, 3), Mino::Z(0, 3), Mino::T(0, 3)},
+      cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
+      next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       mino_idx(0),
 
       board(),
@@ -445,36 +448,47 @@ class YomoTetris_240x240 {
       bgcolor(TFT_BLACK),
       screen(screen),
       board_sprite(&screen),
-      next_minos_sprites{TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen)}
+      next_minos_sprites{TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen)},
+      hold_sprite(&screen)
       {
         shuffle_bag(cur_bag);
         shuffle_bag(next_bag);
       }
 
-    void shuffle_bag(std::array<Mino, 7>& bag) {
+    void shuffle_bag(std::array<MinoType, 7>& bag) {
       for (int i = 0; i < 7; i++) {
         int r = random(i, 7);
-        Mino temp = bag[i];
+        MinoType temp = bag[i];
         bag[i] = bag[r];
         bag[r] = temp;
       }
     }
 
-    Mino randomMino() {
-      Mino next = cur_bag[mino_idx];
+    Mino next_mino() {
+      MinoType next = cur_bag[mino_idx];
       mino_idx++;
       if (mino_idx == 7) {
         cur_bag = next_bag;
         shuffle_bag(next_bag);
         mino_idx = 0;
       }
-      return next;
+      return Mino::from_type(next);
     }
 
-    char next_mino_type(int offset) {
+    MinoType next_mino_type(int offset) {
       int idx = mino_idx + offset;
-      if (idx < 7) return cur_bag[idx].kind;
-      return next_bag[idx - 7].kind;
+      if (idx < 7) return cur_bag[idx];
+      return next_bag[idx - 7];
+    }
+
+    boolean try_place_mino(Mino m, unsigned long now) {
+      if (!board.mino_placable(m)) return false;
+      board.place_mino(m);
+      free_fall_timer = now;
+      last_moved_at = now;
+      lockdown_judging = false;
+      move_cnt_while_lockdown_judging = 0;
+      return true;
     }
 
     boolean try_move(MoveDirection dir, int distance, unsigned long now) {
@@ -522,7 +536,19 @@ class YomoTetris_240x240 {
       screen.drawFastVLine(next_minos_grid_top_left_x + next_minos_grid_width - 1, next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top right to down
       screen.setTextColor(TFT_WHITE, bgcolor);
       screen.setTextDatum(TC_DATUM);
-      screen.drawString("NEXT", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
+      screen.drawString("Next", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
+
+      /* hold area */
+      hold_sprite.createSprite(4 * hold_block_size, 4 * hold_block_size);
+      const int hold_grid_width = 1 + hold_left_margin + hold_block_size * 4 + hold_right_margin + 1;
+      const int hold_grid_height = 1 + hold_top_margin + hold_block_size * 4 + hold_bottom_margin + 1;
+      screen.drawFastHLine(hold_grid_top_left_x,                       hold_grid_top_left_y,                        hold_grid_width,      TFT_WHITE); // top left to right
+      screen.drawFastHLine(hold_grid_top_left_x,                       hold_grid_top_left_y + hold_grid_height - 1, hold_grid_width,      TFT_WHITE); // bottom left to right
+      screen.drawFastVLine(hold_grid_top_left_x,                       hold_grid_top_left_y + 1,                    hold_grid_height - 2, TFT_WHITE); // top left to down
+      screen.drawFastVLine(hold_grid_top_left_x + hold_grid_width - 1, hold_grid_top_left_y + 1,                    hold_grid_height - 2, TFT_WHITE); // top right to down
+      screen.setTextColor(TFT_WHITE, bgcolor);
+      screen.setTextDatum(TC_DATUM);
+      screen.drawString("Hold", hold_grid_top_left_x + hold_grid_width / 2, hold_grid_top_left_y - 18, 2);
 
       const int FREE_FALL_MS = 1000;
 
@@ -535,6 +561,8 @@ class YomoTetris_240x240 {
       boolean was_b = false;
       boolean was_right = false;
       boolean was_left = false;
+
+      boolean hold_once_tried = false;
 
       while (true) {
         // delete rows with animation
@@ -587,17 +615,13 @@ class YomoTetris_240x240 {
 
         // new mino pop
         if (!board.cur_mino_exists()) {
-          Mino m = randomMino();
-          if (!board.mino_placable(m)) {
-            Serial.println("Game over");
+          Mino m = next_mino();
+          if (!try_place_mino(m, now)) {
+            Serial.println("Game over!");
             while (true) delay(1000);
           }
-          board.place_mino(m);
+
           render();
-          free_fall_timer = now;
-          last_moved_at = now;
-          lockdown_judging = false;
-          move_cnt_while_lockdown_judging = 0;
           continue;
         }
 
@@ -613,9 +637,34 @@ class YomoTetris_240x240 {
           }
           render();
           board.fix_mino();
+          if (hold_once_tried) hold_once_tried = false;
           continue;
         }
         was_up = btns.UP;
+
+        // hold
+        // because R button does not exist, uses SELECT press as hold
+        if (btns.SELECT) {
+          if (!hold_once_tried && board.cur_mino_exists()) {
+            hold_once_tried = true;
+
+            // temporary save current hold mino
+            std::optional<Mino> temp = hold_mino;
+
+            // next hold mino is current mino
+            hold_mino = Mino::from_type(board.cur_mino->type);
+
+            // next mino is holded one if hold exists, else next_mino();
+            Mino next = temp.has_value() ? *temp : next_mino();
+
+            if (!try_place_mino(next, now)) {
+              Serial.println("Game over!");
+              while (true) delay(1000);
+            }
+
+            render();
+          }
+        }
 
         // rotation
         if (btns.A && !was_a) {
@@ -677,10 +726,11 @@ class YomoTetris_240x240 {
           if (!lockdown_judging) lockdown_judging = true;
           if (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit) {
             board.fix_mino();
-            lockdown_judging = false;
-            move_cnt_while_lockdown_judging = 0;
+            if (hold_once_tried) hold_once_tried = false;
           }
-        } else {
+        } else if (lockdown_judging) {
+          // in case once landed and judge started, but now it's not landed, reset them.
+          // this happens when once landed, but moved horizontally, then it's not landed now
           lockdown_judging = false;
           move_cnt_while_lockdown_judging = 0;
         }
@@ -729,15 +779,8 @@ class YomoTetris_240x240 {
       // next minos
       for (int s = 0; s < 6; s++) {
         next_minos_sprites[s].fillSprite(bgcolor);
-        char t = next_mino_type(s);
-        Mino m = Mino::I(0, 0);;
-        if (t == 'O') m = Mino::O(1, 0);
-        else if (t == 'T') m = Mino::T(1, 0);
-        else if (t == 'L') m = Mino::L(1, 0);
-        else if (t == 'J') m = Mino::J(1, 0);
-        else if (t == 'S') m = Mino::S(1, 0);
-        else if (t == 'Z') m = Mino::Z(1, 1);
-
+        MinoType t = next_mino_type(s);
+        Mino m = Mino::from_type_row_col(t, t == MinoType::I ? 0 : 1, t == MinoType::Z ? 1 : 0);
         int x = m.is_I() ? 0 : m.is_O() ? block_size : block_size / 2;
         int y = m.is_I() ? block_size / 2 : 0;
         for (int i = 0; i < 4; i++) {
@@ -747,6 +790,22 @@ class YomoTetris_240x240 {
           next_minos_sprites[s].fillRect(x + b.col * block_size + bevel, y + b.row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, m.color.base);
         }
         next_minos_sprites[s].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (block_size * 2 + next_minos_between_margin) * s);
+      }
+
+      // hold
+      hold_sprite.fillSprite(bgcolor);
+      if (hold_mino.has_value()) {
+        MinoType t = hold_mino->type;
+        Mino m = Mino::from_type_row_col(t, t == MinoType::I ? 0 : 1, t == MinoType::Z ? 1 : 0);
+        int x = m.is_I() ? 0 : m.is_O() ? hold_block_size : hold_block_size / 2;
+        int y = m.is_I() ? hold_block_size + hold_block_size / 2 : hold_block_size;
+        for (int i = 0; i < 4; i++) {
+          BlockPos b = m.positions[i];
+          hold_sprite.fillRect(x + b.col * hold_block_size, y + b.row * hold_block_size, hold_block_size, hold_block_size, m.color.darker);
+          hold_sprite.fillRect(x + b.col * hold_block_size, y + b.row * hold_block_size, hold_block_size - bevel, hold_block_size - bevel, m.color.lighter);
+          hold_sprite.fillRect(x + b.col * hold_block_size + bevel, y + b.row * hold_block_size + bevel, hold_block_size - bevel*2, hold_block_size - bevel*2, m.color.base);
+        }
+        hold_sprite.pushSprite(1 + hold_grid_top_left_x + hold_left_margin, 1 + hold_grid_top_left_y + hold_top_margin);
       }
     }
 };
