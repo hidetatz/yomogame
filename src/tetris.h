@@ -516,19 +516,6 @@ class YomoTetris_240x240 {
       return true;
     }
 
-    void render_square(int top_left_x, int top_left_y, int width, int height) {
-      screen.drawFastHLine(top_left_x,             top_left_y,              width,      TFT_WHITE); // top left to right
-      screen.drawFastHLine(top_left_x,             top_left_y + height - 1, width,      TFT_WHITE); // bottom left to right
-      screen.drawFastVLine(top_left_x,             top_left_y + 1,          height - 2, TFT_WHITE); // top left to down
-      screen.drawFastVLine(top_left_x + width - 1, top_left_y + 1,          height - 2, TFT_WHITE); // top right to down
-    }
-
-    void render_centered_label(const char *string, int x, int y, uint8_t font) {
-      screen.setTextColor(TFT_WHITE, bgcolor);
-      screen.setTextDatum(TC_DATUM);
-      screen.drawString(string, x, y, font);
-    }
-
     void start() {
       /* board area */
       board_sprite.createSprite(10 * block_size, 20 * block_size);
@@ -737,6 +724,50 @@ class YomoTetris_240x240 {
       }
     }
 
+    /*
+     * rendering
+     */
+
+    void render_square(int top_left_x, int top_left_y, int width, int height) {
+      screen.drawFastHLine(top_left_x,             top_left_y,              width,      TFT_WHITE); // top left to right
+      screen.drawFastHLine(top_left_x,             top_left_y + height - 1, width,      TFT_WHITE); // bottom left to right
+      screen.drawFastVLine(top_left_x,             top_left_y + 1,          height - 2, TFT_WHITE); // top left to down
+      screen.drawFastVLine(top_left_x + width - 1, top_left_y + 1,          height - 2, TFT_WHITE); // top right to down
+    }
+
+    void render_centered_label(const char *string, int x, int y, uint8_t font) {
+      screen.setTextColor(TFT_WHITE, bgcolor);
+      screen.setTextDatum(TC_DATUM);
+      screen.drawString(string, x, y, font);
+    }
+
+    void render_empty_block(TFT_eSprite& sprite, int row, int col, int block_size) {
+      sprite.fillRect(col * block_size, row * block_size, block_size, block_size, bgcolor);
+    }
+
+    void render_block(TFT_eSprite& sprite, int row, int col, int x_offset, int y_offset, int block_size, BlockColor color) {
+      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size,           block_size,           color.darker);
+      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size - bevel,   block_size - bevel,   color.lighter);
+      sprite.fillRect(x_offset + col * block_size + bevel, y_offset + row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, color.base);
+    }
+
+    void render_ghost_block(TFT_eSprite& sprite, int row, int col, int block_size, int distance, BlockColor color) {
+      sprite.drawRect(col * block_size,     (row + distance) * block_size,     block_size,     block_size,     color.base);
+      sprite.drawRect(col * block_size + 1, (row + distance) * block_size + 1, block_size - 2, block_size - 2, color.base);
+    }
+
+    void render_mino(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset, int block_size) {
+      for (int i = 0; i < 4; i++) {
+        render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, block_size, m.color);
+      }
+    }
+
+    void render_ghost_mino(TFT_eSprite& sprite, Mino m, int block_size, int distance) {
+      for (int i = 0; i < 4; i++) {
+        render_ghost_block(sprite, m.positions[i].row, m.positions[i].col, block_size, distance, m.color);
+      }
+    }
+
     void render() {
       board_sprite.fillSprite(bgcolor);
 
@@ -744,32 +775,19 @@ class YomoTetris_240x240 {
       for (int row = 0; row < 20; row++) {
         for (int col = 0; col < 10; col++) {
           if (!board.block_exists(row, col)) {
-            board_sprite.fillRect(col * block_size, row * block_size, block_size, block_size, TFT_BLACK);
+            render_empty_block(board_sprite, row, col, block_size);
           } else {
             for (int j = 0; j < 4; j++) {
-              board_sprite.fillRect(col * block_size, row * block_size, block_size, block_size, board.blocks[row][col]->color.darker);
-              board_sprite.fillRect(col * block_size, row * block_size, block_size - bevel, block_size - bevel, board.blocks[row][col]->color.lighter);
-              board_sprite.fillRect(col * block_size + bevel, row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, board.blocks[row][col]->color.base);
+              render_block(board_sprite, row, col, 0, 0, block_size, board.blocks[row][col]->color);
             }
           }
         }
       }
 
+      // ghosts and current mino
       if (board.cur_mino_exists()) {
-        // ghosts
-        int distance = board.hard_drop_distance();
-        for (int i = 0; i < 4; i++) {
-          board_sprite.drawRect(board.cur_mino->positions[i].col * block_size, (board.cur_mino->positions[i].row + distance) * block_size, block_size, block_size, board.cur_mino->color.base);
-          board_sprite.drawRect(board.cur_mino->positions[i].col * block_size + 1, (board.cur_mino->positions[i].row + distance) * block_size + 1, block_size - 2, block_size - 2, board.cur_mino->color.base);
-        }
-
-        // cur_mino
-        for (int i = 0; i < 4; i++) {
-          BlockPos b = board.cur_mino->positions[i];
-          board_sprite.fillRect(b.col * block_size, b.row * block_size, block_size, block_size, board.cur_mino->color.darker);
-          board_sprite.fillRect(b.col * block_size, b.row * block_size, block_size - bevel, block_size - bevel, board.cur_mino->color.lighter);
-          board_sprite.fillRect(b.col * block_size + bevel, b.row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, board.cur_mino->color.base);
-        }
+        render_ghost_mino(board_sprite, *board.cur_mino, block_size, board.hard_drop_distance());
+        render_mino(board_sprite, *board.cur_mino, 0, 0, block_size);
       }
 
       board_sprite.pushSprite(board_grid_top_left_x+1, board_grid_top_left_y+1);
@@ -781,12 +799,8 @@ class YomoTetris_240x240 {
         Mino m = Mino::from_type_row_col(t, t == MinoType::I ? 0 : 1, t == MinoType::Z ? 1 : 0);
         int x = m.is_I() ? 0 : m.is_O() ? next_minos_block_size : next_minos_block_size / 2;
         int y = m.is_I() ? next_minos_block_size / 2 : 0;
-        for (int i = 0; i < 4; i++) {
-          BlockPos b = m.positions[i];
-          next_minos_sprites[s].fillRect(x + b.col * next_minos_block_size,         y + b.row * next_minos_block_size,         next_minos_block_size,           next_minos_block_size,           m.color.darker);
-          next_minos_sprites[s].fillRect(x + b.col * next_minos_block_size,         y + b.row * next_minos_block_size,         next_minos_block_size - bevel,   next_minos_block_size - bevel,   m.color.lighter);
-          next_minos_sprites[s].fillRect(x + b.col * next_minos_block_size + bevel, y + b.row * next_minos_block_size + bevel, next_minos_block_size - bevel*2, next_minos_block_size - bevel*2, m.color.base);
-        }
+
+        render_mino(next_minos_sprites[s], m, x, y, next_minos_block_size);
         next_minos_sprites[s].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (next_minos_block_size * 2 + next_minos_between_margin) * s);
       }
 
@@ -797,12 +811,8 @@ class YomoTetris_240x240 {
         Mino m = Mino::from_type_row_col(t, t == MinoType::I ? 0 : 1, t == MinoType::Z ? 1 : 0);
         int x = m.is_I() ? 0 : m.is_O() ? hold_block_size : hold_block_size / 2;
         int y = m.is_I() ? hold_block_size + hold_block_size / 2 : hold_block_size;
-        for (int i = 0; i < 4; i++) {
-          BlockPos b = m.positions[i];
-          hold_sprite.fillRect(x + b.col * hold_block_size, y + b.row * hold_block_size, hold_block_size, hold_block_size, m.color.darker);
-          hold_sprite.fillRect(x + b.col * hold_block_size, y + b.row * hold_block_size, hold_block_size - bevel, hold_block_size - bevel, m.color.lighter);
-          hold_sprite.fillRect(x + b.col * hold_block_size + bevel, y + b.row * hold_block_size + bevel, hold_block_size - bevel*2, hold_block_size - bevel*2, m.color.base);
-        }
+
+        render_mino(hold_sprite, m, x, y, hold_block_size);
         hold_sprite.pushSprite(1 + hold_grid_top_left_x + hold_left_margin, 1 + hold_grid_top_left_y + hold_top_margin);
       }
     }
