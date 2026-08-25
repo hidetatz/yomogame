@@ -11,6 +11,11 @@
 
 #define LOGF(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
 
+/*
+ * Mino and Board
+ * This does not depend on screen size.
+ */
+
 // color of block in tetrimino
 class BlockColor {
   public:
@@ -379,6 +384,13 @@ class Board {
       }
     }
 };
+
+/*
+ * Tetris main logic.
+ *
+ * This currently depends on 240x240 TFT screen.
+ */
+
 
 const int block_size = 11;
 const int bevel = 2;
