@@ -516,40 +516,37 @@ class YomoTetris_240x240 {
       return true;
     }
 
+    void render_square(int top_left_x, int top_left_y, int width, int height) {
+      screen.drawFastHLine(top_left_x,             top_left_y,              width,      TFT_WHITE); // top left to right
+      screen.drawFastHLine(top_left_x,             top_left_y + height - 1, width,      TFT_WHITE); // bottom left to right
+      screen.drawFastVLine(top_left_x,             top_left_y + 1,          height - 2, TFT_WHITE); // top left to down
+      screen.drawFastVLine(top_left_x + width - 1, top_left_y + 1,          height - 2, TFT_WHITE); // top right to down
+    }
+
+    void render_centered_label(const char *string, int x, int y, uint8_t font) {
+      screen.setTextColor(TFT_WHITE, bgcolor);
+      screen.setTextDatum(TC_DATUM);
+      screen.drawString(string, x, y, font);
+    }
+
     void start() {
       /* board area */
       board_sprite.createSprite(10 * block_size, 20 * block_size);
-      // 1 is line itself
-      const int board_grid_width = 1 + block_size * 10 + 1;
-      const int board_grid_height = 1 + block_size * 20 + 1;
-      screen.drawFastHLine(board_grid_top_left_x,                        board_grid_top_left_y,                         board_grid_width,      TFT_WHITE); // top left to right
-      screen.drawFastHLine(board_grid_top_left_x,                        board_grid_top_left_y + board_grid_height - 1, board_grid_width,      TFT_WHITE); // bottom left to right
-      screen.drawFastVLine(board_grid_top_left_x,                        board_grid_top_left_y + 1,                     board_grid_height - 2, TFT_WHITE); // top left to down
-      screen.drawFastVLine(board_grid_top_left_x + board_grid_width - 1, board_grid_top_left_y + 1,                     board_grid_height - 2, TFT_WHITE); // top right to down
+      render_square(board_grid_top_left_x, board_grid_top_left_y, block_size * 10 + 2, block_size * 20 + 2);
 
       /* next_minos area */
       for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(next_minos_block_size * 4, next_minos_block_size * 2);
-      const int next_minos_grid_width = 1 + next_minos_left_margin + next_minos_block_size * 4 + next_minos_right_margin + 1;
-      const int next_minos_grid_height = 1 + next_minos_top_margin + next_minos_block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 1;
-      screen.drawFastHLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y,                              next_minos_grid_width,      TFT_WHITE); // top left to right
-      screen.drawFastHLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + next_minos_grid_height - 1, next_minos_grid_width,      TFT_WHITE); // bottom left to right
-      screen.drawFastVLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top left to down
-      screen.drawFastVLine(next_minos_grid_top_left_x + next_minos_grid_width - 1, next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top right to down
-      screen.setTextColor(TFT_WHITE, bgcolor);
-      screen.setTextDatum(TC_DATUM);
-      screen.drawString("Next", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
+      const int next_minos_grid_width = next_minos_left_margin + next_minos_block_size * 4 + next_minos_right_margin + 2;
+      const int next_minos_grid_height = next_minos_top_margin + next_minos_block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 2;
+      render_square(next_minos_grid_top_left_x, next_minos_grid_top_left_y, next_minos_grid_width, next_minos_grid_height);
+      render_centered_label("Next", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
 
       /* hold area */
       hold_sprite.createSprite(4 * hold_block_size, 4 * hold_block_size);
-      const int hold_grid_width = 1 + hold_left_margin + hold_block_size * 4 + hold_right_margin + 1;
-      const int hold_grid_height = 1 + hold_top_margin + hold_block_size * 4 + hold_bottom_margin + 1;
-      screen.drawFastHLine(hold_grid_top_left_x,                       hold_grid_top_left_y,                        hold_grid_width,      TFT_WHITE); // top left to right
-      screen.drawFastHLine(hold_grid_top_left_x,                       hold_grid_top_left_y + hold_grid_height - 1, hold_grid_width,      TFT_WHITE); // bottom left to right
-      screen.drawFastVLine(hold_grid_top_left_x,                       hold_grid_top_left_y + 1,                    hold_grid_height - 2, TFT_WHITE); // top left to down
-      screen.drawFastVLine(hold_grid_top_left_x + hold_grid_width - 1, hold_grid_top_left_y + 1,                    hold_grid_height - 2, TFT_WHITE); // top right to down
-      screen.setTextColor(TFT_WHITE, bgcolor);
-      screen.setTextDatum(TC_DATUM);
-      screen.drawString("Hold", hold_grid_top_left_x + hold_grid_width / 2, hold_grid_top_left_y - 18, 2);
+      const int hold_grid_width = hold_left_margin + hold_block_size * 4 + hold_right_margin + 2;
+      const int hold_grid_height = hold_top_margin + hold_block_size * 4 + hold_bottom_margin + 2;
+      render_square(hold_grid_top_left_x, hold_grid_top_left_y, hold_grid_width, hold_grid_height);
+      render_centered_label("Hold", hold_grid_top_left_x + hold_grid_width / 2, hold_grid_top_left_y - 18, 2);
 
       const int FREE_FALL_MS = 1000;
 
