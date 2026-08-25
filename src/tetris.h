@@ -386,13 +386,14 @@ const int bevel = 2;
 const int board_grid_top_left_x = 64;
 const int board_grid_top_left_y = 9;
 
-const int next_minos_grid_top_left_x = 180;
+const int next_minos_block_size = 8;
+const int next_minos_grid_top_left_x = 187;
 const int next_minos_grid_top_left_y = 27;
-const int next_minos_left_margin = 5;
-const int next_minos_right_margin = 5;
-const int next_minos_top_margin = 10;
-const int next_minos_bottom_margin = 10;
-const int next_minos_between_margin = 10;
+const int next_minos_left_margin = 4;
+const int next_minos_right_margin = 4;
+const int next_minos_top_margin = 8;
+const int next_minos_bottom_margin = 8;
+const int next_minos_between_margin = 8;
 
 const int hold_block_size = 8;
 const int hold_grid_top_left_x = 11;
@@ -527,9 +528,9 @@ class YomoTetris_240x240 {
       screen.drawFastVLine(board_grid_top_left_x + board_grid_width - 1, board_grid_top_left_y + 1,                     board_grid_height - 2, TFT_WHITE); // top right to down
 
       /* next_minos area */
-      for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(block_size * 4, block_size * 2);
-      const int next_minos_grid_width = 1 + next_minos_left_margin + block_size * 4 + next_minos_right_margin + 1;
-      const int next_minos_grid_height = 1 + next_minos_top_margin + block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 1;
+      for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(next_minos_block_size * 4, next_minos_block_size * 2);
+      const int next_minos_grid_width = 1 + next_minos_left_margin + next_minos_block_size * 4 + next_minos_right_margin + 1;
+      const int next_minos_grid_height = 1 + next_minos_top_margin + next_minos_block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 1;
       screen.drawFastHLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y,                              next_minos_grid_width,      TFT_WHITE); // top left to right
       screen.drawFastHLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + next_minos_grid_height - 1, next_minos_grid_width,      TFT_WHITE); // bottom left to right
       screen.drawFastVLine(next_minos_grid_top_left_x,                             next_minos_grid_top_left_y + 1,                          next_minos_grid_height - 2, TFT_WHITE); // top left to down
@@ -781,15 +782,15 @@ class YomoTetris_240x240 {
         next_minos_sprites[s].fillSprite(bgcolor);
         MinoType t = next_mino_type(s);
         Mino m = Mino::from_type_row_col(t, t == MinoType::I ? 0 : 1, t == MinoType::Z ? 1 : 0);
-        int x = m.is_I() ? 0 : m.is_O() ? block_size : block_size / 2;
-        int y = m.is_I() ? block_size / 2 : 0;
+        int x = m.is_I() ? 0 : m.is_O() ? next_minos_block_size : next_minos_block_size / 2;
+        int y = m.is_I() ? next_minos_block_size / 2 : 0;
         for (int i = 0; i < 4; i++) {
           BlockPos b = m.positions[i];
-          next_minos_sprites[s].fillRect(x + b.col * block_size, y + b.row * block_size, block_size, block_size, m.color.darker);
-          next_minos_sprites[s].fillRect(x + b.col * block_size, y + b.row * block_size, block_size - bevel, block_size - bevel, m.color.lighter);
-          next_minos_sprites[s].fillRect(x + b.col * block_size + bevel, y + b.row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, m.color.base);
+          next_minos_sprites[s].fillRect(x + b.col * next_minos_block_size,         y + b.row * next_minos_block_size,         next_minos_block_size,           next_minos_block_size,           m.color.darker);
+          next_minos_sprites[s].fillRect(x + b.col * next_minos_block_size,         y + b.row * next_minos_block_size,         next_minos_block_size - bevel,   next_minos_block_size - bevel,   m.color.lighter);
+          next_minos_sprites[s].fillRect(x + b.col * next_minos_block_size + bevel, y + b.row * next_minos_block_size + bevel, next_minos_block_size - bevel*2, next_minos_block_size - bevel*2, m.color.base);
         }
-        next_minos_sprites[s].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (block_size * 2 + next_minos_between_margin) * s);
+        next_minos_sprites[s].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (next_minos_block_size * 2 + next_minos_between_margin) * s);
       }
 
       // hold
