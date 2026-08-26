@@ -893,7 +893,8 @@ class YomoTetris_240x240 {
     }
 
     void render_ghost_mino_on_board(Mino m, int hard_drop_distance) {
-      for (int i = 0; i < 4; i++) render_ghost_block(board_sprite, m.positions[i].row+hard_drop_distance, m.positions[i].col, block_size, m.color.base);
+      uint16_t color = m.overridden_color.has_value() ? *m.overridden_color : m.color.base;
+      for (int i = 0; i < 4; i++) render_ghost_block(board_sprite, m.positions[i].row+hard_drop_distance, m.positions[i].col, block_size, color);
     }
 
     void render_blocks_on_board() {
