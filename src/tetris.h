@@ -144,6 +144,10 @@ class Mino {
       return type == MinoType::I;
     }
 
+    boolean is_T() {
+      return type == MinoType::T;
+    }
+
     std::array<int, 8> get_rotated_blocks_pos(RotateDirection dir) {
       std::array<int, 8> result;
       for (int i = 0; i < 4; i++) {
@@ -328,8 +332,8 @@ class Board {
       else if (dir == MoveDirection::LEFT) cur_mino->left(distance);
     }
 
-    boolean rotate(RotateDirection dir) {
-      if (cur_mino->is_O()) return false; // o does not rotate
+    std::tuple<boolean, int> rotate(RotateDirection dir) {
+      if (cur_mino->is_O()) return {false, 0}; // o does not rotate
 
       // srs
       std::array<int, 8> base_pos = cur_mino->get_rotated_blocks_pos(dir);
@@ -346,10 +350,10 @@ class Board {
           else move_mino(MoveDirection::LEFT, -kick[0]);
           if (kick[1] > 0) move_mino(MoveDirection::UP, kick[1]);
           else move_mino(MoveDirection::DOWN, -kick[1]);
-          return true;
+          return {true, i};
         }
       }
-      return false;
+      return {false, 0};
     }
 
     boolean mino_landed() {
@@ -481,6 +485,8 @@ class YomoTetris_240x240 {
 
     std::optional<Mino> hold_mino;
 
+    int last_kick_index;
+    boolean was_last_move_rotation;
     unsigned long last_moved_at;
     unsigned long last_horizontally_moved_at;
     unsigned long free_fall_timer;
@@ -514,6 +520,8 @@ class YomoTetris_240x240 {
 
       board(),
 
+      last_kick_index(0),
+      was_last_move_rotation(false),
       last_moved_at(0),
       last_horizontally_moved_at(0),
       free_fall_timer(0),
@@ -592,14 +600,17 @@ class YomoTetris_240x240 {
         free_fall_timer = now;
       }
       last_moved_at = now;
+      was_last_move_rotation = false;
       return true;
     }
 
     boolean try_rotate(RotateDirection dir, unsigned long now) {
-      boolean rotated = board.rotate(dir);
+      auto [rotated, kick_index] = board.rotate(dir);
       if (!rotated) return false;
+      last_kick_index = kick_index;
       if (lockdown_judging) move_cnt_while_lockdown_judging++;
       last_moved_at = now;
+      was_last_move_rotation = true;
       return true;
     }
 
@@ -612,7 +623,85 @@ class YomoTetris_240x240 {
       }
     }
 
+    void check_tspin() {
+      if (!board.cur_mino->is_T()) return;
+      if (!was_last_move_rotation) return;
+      // A and B are front side corner
+      int A_row = 0;
+      int A_col = 0;
+      int B_row = 0;
+      int B_col = 0;
+      int C_row = 0;
+      int C_col = 0;
+      int D_row = 0;
+      int D_col = 0;
+
+      Pivot p = board.cur_mino->pivot;
+      if (board.cur_mino->cur_direction == MinoDirection::NORTH) {
+        A_row = p.row-1;
+        A_col = p.col-1;
+        B_row = p.row-1;
+        B_col = p.col+1;
+        C_row = p.row+1;
+        C_col = p.col-1;
+        D_row = p.row+1;
+        D_col = p.col+1;
+      } else if (board.cur_mino->cur_direction == MinoDirection::EAST) {
+        C_row = p.row-1;
+        C_col = p.col-1;
+        A_row = p.row-1;
+        A_col = p.col+1;
+        D_row = p.row+1;
+        D_col = p.col-1;
+        B_row = p.row+1;
+        B_col = p.col+1;
+      } else if (board.cur_mino->cur_direction == MinoDirection::SOUTH) {
+        D_row = p.row-1;
+        D_col = p.col-1;
+        C_row = p.row-1;
+        C_col = p.col+1;
+        B_row = p.row+1;
+        B_col = p.col-1;
+        A_row = p.row+1;
+        A_col = p.col+1;
+      } else {
+        B_row = p.row-1;
+        B_col = p.col-1;
+        D_row = p.row-1;
+        D_col = p.col+1;
+        A_row = p.row+1;
+        A_col = p.col-1;
+        C_row = p.row+1;
+        C_col = p.col+1;
+      }
+
+      boolean A_filled = !board.block_placable_at(A_row, A_col);
+      boolean B_filled = !board.block_placable_at(B_row, B_col);
+      boolean C_filled = !board.block_placable_at(C_row, C_col);
+      boolean D_filled = !board.block_placable_at(D_row, D_col);
+
+      int filled_count = 0;
+      if (A_filled) filled_count++;
+      if (B_filled) filled_count++;
+      if (C_filled) filled_count++;
+      if (D_filled) filled_count++;
+
+      if (filled_count < 3) return;
+
+      if ((A_filled && B_filled) || last_kick_index == 4) {
+        tspins++;
+        // T-Spin
+      } else {
+        tspins++;
+        // T-Spin mini
+      }
+    }
+
     void lock_mino_and_clear_lines() {
+      // T-spin check
+      check_tspin();
+      last_kick_index = 0;
+
       board.lockdown_mino();
       mino_placed++;
       if (hold_once_tried) hold_once_tried = false;
