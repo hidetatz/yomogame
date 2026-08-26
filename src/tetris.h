@@ -10,6 +10,7 @@
 #include <TFT_eSPI.h>
 
 #include <input.h>
+#include <yomogi.h>
 
 /*
  * Mino and Board
@@ -682,6 +683,10 @@ class YomoTetris_240x240 {
       render_left_label("CMB", stats_label_x, combos_y, 1);
       render_left_label("TPM", stats_label_x, tpm_y, 1);
       render_left_label("LPM", stats_label_x, lpm_y, 1);
+
+      /* yomogi area */
+      screen.setSwapBytes(true);
+      screen.pushImage(183, 187, YOMOGI_WIDTH, YOMOGI_HEIGHT, yomogi, YOMOGI_TRANSPARENT);
 
       const int FREE_FALL_MS = 1000;
 
