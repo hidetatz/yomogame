@@ -498,7 +498,7 @@ class YomoTetris_240x240 {
     unsigned long game_started_at;
     int score;
     int removed_lines;
-    int level;
+    int starting_level;
     int goal;
     int tetris_count;
     int tspins;
@@ -533,7 +533,7 @@ class YomoTetris_240x240 {
       game_started_at(0),
       score(0),
       removed_lines(0),
-      level(1),
+      starting_level(1),
       goal(0),
       tetris_count(0),
       tspins(0),
@@ -1071,7 +1071,7 @@ class YomoTetris_240x240 {
       // can display 5 chars (because of label on the same line)
       stats_sprite.fillRect(0, 0, 32, 98, bgcolor);
       render_right_label_sprite(stats_sprite, std::to_string(removed_lines).c_str(), 32, 0, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(level).c_str(), 32, 13, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(starting_level + (removed_lines / 10)).c_str(), 32, 13, 1);
       render_right_label_sprite(stats_sprite, std::to_string(goal).c_str(), 32, 26, 1);
       render_right_label_sprite(stats_sprite, std::to_string(tetris_count).c_str(), 32, 39, 1);
       render_right_label_sprite(stats_sprite, std::to_string(tspins).c_str(), 32, 52, 1);
