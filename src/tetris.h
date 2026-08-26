@@ -2,6 +2,7 @@
 #include <array>
 #include <optional>
 #include <tuple>
+#include <string>
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -415,6 +416,22 @@ const int hold_right_margin = 4;
 const int hold_top_margin = 4;
 const int hold_bottom_margin = 4;
 
+const int stats_label_x     = 5;
+const int stats_right_align = 59;
+
+const int score_label_y     = 80;
+const int score_y           = 93;
+const int time_label_y      = 106;
+const int time_y            = 119;
+const int lines_y           = 132;
+const int level_y           = 145;
+const int goal_y            = 158;
+const int tetris_y          = 171;
+const int tspins_y          = 184;
+const int combos_y          = 197;
+const int tpm_y             = 210;
+const int lpm_y             = 223;
+
 const int horizontal_move_first_wait_ms = 300;
 const int horizontal_move_auto_repeating_wait_ms = 50;
 const int lockdown_wait_ms = 500;
@@ -436,12 +453,24 @@ class YomoTetris_240x240 {
     boolean lockdown_judging;
     int move_cnt_while_lockdown_judging;
 
+    unsigned long game_started_at;
+    int score;
+    int removed_lines;
+    int level;
+    int goal;
+    int tetris_count;
+    int tspins;
+    int combos;
+    int tpm;
+    int lpm;
+
     Input input;
     uint16_t bgcolor;
     TFT_eSPI &screen;
     TFT_eSprite board_sprite;
     std::array<TFT_eSprite, 6> next_minos_sprites;
     TFT_eSprite hold_sprite;
+    TFT_eSprite stats_sprite;
 
   public:
     YomoTetris_240x240(Input input, TFT_eSPI &screen) :
@@ -457,12 +486,24 @@ class YomoTetris_240x240 {
       lockdown_judging(false),
       move_cnt_while_lockdown_judging(0),
 
+      game_started_at(0),
+      score(0),
+      removed_lines(0),
+      level(1),
+      goal(0),
+      tetris_count(0),
+      tspins(0),
+      combos(0),
+      tpm(0),
+      lpm(0),
+
       input(input),
       bgcolor(TFT_BLACK),
       screen(screen),
       board_sprite(&screen),
       next_minos_sprites{TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen)},
-      hold_sprite(&screen)
+      hold_sprite(&screen),
+      stats_sprite(&screen)
       {
         shuffle_bag(cur_bag);
         shuffle_bag(next_bag);
@@ -547,6 +588,20 @@ class YomoTetris_240x240 {
       render_square(hold_grid_top_left_x, hold_grid_top_left_y, hold_grid_width, hold_grid_height);
       render_centered_label("Hold", hold_grid_top_left_x + hold_grid_width / 2, hold_grid_top_left_y - 18, 2);
 
+      /* stats area */
+      render_left_label("Score", stats_label_x, score_label_y, 1);
+      render_left_label("Time", stats_label_x, time_label_y, 1);
+
+      stats_sprite.createSprite(32, 98);
+      render_left_label("LNS", stats_label_x, lines_y, 1);
+      render_left_label("LVL", stats_label_x, level_y, 1);
+      render_left_label("GOL", stats_label_x, goal_y, 1);
+      render_left_label("TET", stats_label_x, tetris_y, 1);
+      render_left_label("TSP", stats_label_x, tspins_y, 1);
+      render_left_label("CMB", stats_label_x, combos_y, 1);
+      render_left_label("TPM", stats_label_x, tpm_y, 1);
+      render_left_label("LPM", stats_label_x, lpm_y, 1);
+
       const int FREE_FALL_MS = 1000;
 
       unsigned long last_soft_dropped = 0;
@@ -560,6 +615,8 @@ class YomoTetris_240x240 {
       boolean was_left = false;
 
       boolean hold_once_tried = false;
+
+      game_started_at = millis();
 
       while (true) {
         // delete rows with animation
@@ -753,6 +810,24 @@ class YomoTetris_240x240 {
       screen.drawString(string, x, y, font);
     }
 
+    void render_left_label(const char *string, int x, int y, uint8_t font) {
+      screen.setTextColor(TFT_WHITE, bgcolor);
+      screen.setTextDatum(TL_DATUM);
+      screen.drawString(string, x, y, font);
+    }
+
+    void render_right_label(const char *string, int x, int y, uint8_t font) {
+      screen.setTextColor(TFT_WHITE, bgcolor);
+      screen.setTextDatum(TR_DATUM);
+      screen.drawString(string, x, y, font);
+    }
+
+    void render_right_label_sprite(TFT_eSprite& sprite, const char *string, int x, int y, uint8_t font) {
+      sprite.setTextColor(TFT_WHITE, bgcolor);
+      sprite.setTextDatum(TR_DATUM);
+      sprite.drawString(string, x, y, font);
+    }
+
     void render_empty_block(TFT_eSprite& sprite, int row, int col, int block_size) {
       sprite.fillRect(col * block_size, row * block_size, block_size, block_size, bgcolor);
     }
@@ -827,5 +902,32 @@ class YomoTetris_240x240 {
         render_mino(hold_sprite, m, x, y, hold_block_size);
         hold_sprite.pushSprite(1 + hold_grid_top_left_x + hold_left_margin, 1 + hold_grid_top_left_y + hold_top_margin);
       }
+
+      // stats
+
+      // first fill black
+
+      // can display 9 chars
+      render_right_label(std::to_string(score).c_str(), stats_right_align, score_y, 1);
+
+      unsigned long elapsed_ms = millis() - game_started_at;
+      int minutes = elapsed_ms / (1000 * 60);
+      int seconds = (elapsed_ms / 1000) % 60;
+      int centis = (elapsed_ms % 1000) / 10;
+      char time[9];
+      snprintf(time, sizeof(time), "%02d:%02d:%02d", minutes, seconds, centis);
+      render_right_label(time, stats_right_align, time_y, 1);
+
+      // can display 5 chars (because of label on the same line)
+      stats_sprite.fillRect(0, 0, 32, 98, bgcolor);
+      render_right_label_sprite(stats_sprite, std::to_string(removed_lines).c_str(), 32, 0, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(level).c_str(), 32, 13, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(goal).c_str(), 32, 26, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(tetris_count).c_str(), 32, 39, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(tspins).c_str(), 32, 52, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(combos).c_str(), 32, 65, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(tpm).c_str(), 32, 78, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(lpm).c_str(), 32, 91, 1);
+      stats_sprite.pushSprite(27, lines_y);
     }
 };
