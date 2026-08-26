@@ -613,11 +613,16 @@ class YomoTetris_240x240 {
 
     void lock_mino_and_clear_lines() {
       board.lockdown_mino();
+      mino_placed++;
       if (hold_once_tried) hold_once_tried = false;
 
       // delete rows with animation
       auto [count, rows] = board.deletable_rows();
-      if (count == 0) return;
+      if (count == 0) {
+        // if mino locked but no lines cleared, cancel combo
+        combos = 0;
+        return;
+      }
 
       for (int i = 0; i < 3; i++) {
         // delete animation
@@ -638,9 +643,9 @@ class YomoTetris_240x240 {
         render();
         delay(30);
       }
-      mino_placed++;
       removed_lines += count;
       if (count == 4) tetris_count++;
+      combos++;
 
       board.clear_lines(rows, count);
     }
