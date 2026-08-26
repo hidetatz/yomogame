@@ -377,14 +377,16 @@ class Board {
       return true;
     }
 
-    std::tuple<boolean, std::array<boolean, 20>> deletable_rows() {
-      boolean exists = false;
-      std::array<boolean, 20> result = {};
+    std::tuple<int, std::array<int, 4>> deletable_rows() {
+      int count = 0;
+      std::array<int, 4> rows = {};
       for (int row = 0; row < 20; row++) {
-        result[row] = is_full_row(row);
-        if (result[row]) exists = true;
+        if (is_full_row(row)) {
+          rows[count] = row;
+          count++;
+        }
       }
-      return {exists, result};
+      return {count, rows};
     }
 
     void delete_block(int row, int col) {
@@ -398,10 +400,14 @@ class Board {
       }
     }
 
-    void clear_lines(std::array<boolean, 20> deletable) {
+    void clear_lines(std::array<int, 4> rows, int count) {
+      auto is_deletable = [&](int row) {
+        for (int i = 0; i < count; i++) if (rows[i] == row) return true;
+        return false;
+      };
       int write_row = 19;
       for (int read_row = 19; read_row >= 0; read_row--) {
-        if (!deletable[read_row]) {
+        if (!is_deletable(read_row)) {
           copy_row(read_row, write_row);
           write_row--;
         }
@@ -612,33 +618,29 @@ class YomoTetris_240x240 {
       if (hold_once_tried) hold_once_tried = false;
 
       // delete rows with animation
-      auto [deletable_rows_exists, deletable] = board.deletable_rows();
-      if (!deletable_rows_exists) return;
+      auto [count, rows] = board.deletable_rows();
+      if (count == 0) return;
 
       for (int i = 0; i < 3; i++) {
         // delete animation
         // render flashed (white) lines
-        for (int row = 0; row < 20; row++) {
-          if (deletable[row]) {
-            for (int col = 0; col < 10; col++) {
-              board.blocks[row][col]->override_base_color(TFT_WHITE);
-            }
+        for (int r = 0; r < count; r++) {
+          for (int col = 0; col < 10; col++) {
+            board.blocks[rows[r]][col]->override_base_color(TFT_WHITE);
           }
         }
         render();
         delay(30);
         // render original lines
-        for (int row = 0; row < 20; row++) {
-          if (deletable[row]) {
-            for (int col = 0; col < 10; col++) {
-              board.blocks[row][col]->recover_base_color();
-            }
+        for (int r = 0; r < count; r++) {
+          for (int col = 0; col < 10; col++) {
+            board.blocks[rows[r]][col]->recover_base_color();
           }
         }
         render();
         delay(30);
       }
-      board.clear_lines(deletable);
+      board.clear_lines(rows, count);
     }
 
     void start() {
