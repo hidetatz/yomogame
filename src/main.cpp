@@ -45,8 +45,8 @@ void setup() {
 
   Input input = Input(btnA, btnB, btnS, btnE, btnR, btnU, btnD, btnL);
 
-  YomoTetris_240x240 tetris = YomoTetris_240x240(input, screen);
-  tetris.start();
+  YomoTetris_240x240* tetris = new YomoTetris_240x240(input, screen);
+  tetris->start();
 }
 
 void loop() {
