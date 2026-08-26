@@ -676,7 +676,6 @@ class YomoTetris_240x240 {
             delay(30);
           }
           board.clear_lines(deletable);
-          render();
         }
 
         unsigned long now = millis();
@@ -688,9 +687,6 @@ class YomoTetris_240x240 {
             Serial.println("Game over!");
             while (true) delay(1000);
           }
-
-          render();
-          continue;
         }
 
         ButtonState btns = input.get();
@@ -706,7 +702,7 @@ class YomoTetris_240x240 {
           render();
           board.fix_mino();
           if (hold_once_tried) hold_once_tried = false;
-          continue;
+          continue; // need to continue to pop the new mino
         }
         was_up = btns.UP;
 
@@ -743,8 +739,6 @@ class YomoTetris_240x240 {
               Serial.println("Game over!");
               while (true) delay(1000);
             }
-
-            render();
           }
         }
 
