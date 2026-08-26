@@ -357,7 +357,7 @@ class Board {
       return !can_move_mino(MoveDirection::DOWN, 1);
     }
 
-    void fix_mino() {
+    void lockdown_mino() {
       for (int i = 0; i < 4; i++) blocks[cur_mino->positions[i].row][cur_mino->positions[i].col] = Block(cur_mino->color);
       cur_mino = std::nullopt;
     }
@@ -482,6 +482,7 @@ class YomoTetris_240x240 {
     unsigned long free_fall_timer;
     boolean lockdown_judging;
     int move_cnt_while_lockdown_judging;
+    boolean hold_once_tried;
 
     unsigned long game_started_at;
     int score;
@@ -515,6 +516,7 @@ class YomoTetris_240x240 {
       free_fall_timer(0),
       lockdown_judging(false),
       move_cnt_while_lockdown_judging(0),
+      hold_once_tried(false),
 
       game_started_at(0),
       score(0),
@@ -599,6 +601,40 @@ class YomoTetris_240x240 {
       return true;
     }
 
+    void lock_mino_and_clear_lines() {
+      board.lockdown_mino();
+      if (hold_once_tried) hold_once_tried = false;
+
+      // delete rows with animation
+      auto [deletable_rows_exists, deletable] = board.deletable_rows();
+      if (!deletable_rows_exists) return;
+
+      for (int i = 0; i < 3; i++) {
+        // delete animation
+        // render flashed (white) lines
+        for (int row = 0; row < 20; row++) {
+          if (deletable[row]) {
+            for (int col = 0; col < 10; col++) {
+              board.blocks[row][col]->override_base_color(TFT_WHITE);
+            }
+          }
+        }
+        render();
+        delay(30);
+        // render original lines
+        for (int row = 0; row < 20; row++) {
+          if (deletable[row]) {
+            for (int col = 0; col < 10; col++) {
+              board.blocks[row][col]->recover_base_color();
+            }
+          }
+        }
+        render();
+        delay(30);
+      }
+      board.clear_lines(deletable);
+    }
+
     void start() {
       /* board area */
       board_sprite.createSprite(10 * block_size, 20 * block_size);
@@ -644,40 +680,9 @@ class YomoTetris_240x240 {
       boolean was_right = false;
       boolean was_left = false;
 
-      boolean hold_once_tried = false;
-
       game_started_at = millis();
 
       while (true) {
-        // delete rows with animation
-        auto [deletable_rows_exists, deletable] = board.deletable_rows();
-        if (deletable_rows_exists) {
-          for (int i = 0; i < 3; i++) {
-            // delete animation
-            // render flashed (white) lines
-            for (int row = 0; row < 20; row++) {
-              if (deletable[row]) {
-                for (int col = 0; col < 10; col++) {
-                  board.blocks[row][col]->override_base_color(TFT_WHITE);
-                }
-              }
-            }
-            render();
-            delay(30);
-            // render original lines
-            for (int row = 0; row < 20; row++) {
-              if (deletable[row]) {
-                for (int col = 0; col < 10; col++) {
-                  board.blocks[row][col]->recover_base_color();
-                }
-              }
-            }
-            render();
-            delay(30);
-          }
-          board.clear_lines(deletable);
-        }
-
         unsigned long now = millis();
 
         // new mino pop
@@ -700,8 +705,7 @@ class YomoTetris_240x240 {
             if(i % 3 == 0) render();
           }
           render();
-          board.fix_mino();
-          if (hold_once_tried) hold_once_tried = false;
+          lock_mino_and_clear_lines();
           continue; // need to continue to pop the new mino
         }
         was_up = btns.UP;
@@ -801,8 +805,7 @@ class YomoTetris_240x240 {
         if (board.mino_landed()) {
           if (!lockdown_judging) lockdown_judging = true;
           if (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit) {
-            board.fix_mino();
-            if (hold_once_tried) hold_once_tried = false;
+            lock_mino_and_clear_lines();
           }
         } else if (lockdown_judging) {
           // in case once landed and judge started, but now it's not landed, reset them.
