@@ -66,6 +66,7 @@ class Mino {
   public:
     MinoType type;
     BlockColor color;
+    std::optional<uint16_t> overridden_color;
     std::array<BlockPos, 4> positions;
     Pivot pivot;
     MinoDirection cur_direction;
@@ -238,6 +239,16 @@ class Mino {
       if (cur_direction == MinoDirection::WEST  && dir == RotateDirection::COUNTER_CLOCKWISE && i == 3) return { 0,  2};
       /* if (cur_direction == MinoDirection::WEST  && dir == RotateDirection::COUNTER_CLOCKWISE && i == 4) */ return {-1,  2};
     }
+
+    void override_base_color(uint16_t c) {
+      overridden_color = color.base;
+      color.base = c;
+    }
+
+    void recover_base_color() {
+      color.base = *overridden_color;
+      overridden_color = std::nullopt;
+    }
 };
 
 
@@ -247,8 +258,19 @@ enum class MoveDirection {
 
 class Block {
   public:
+    std::optional<uint16_t> overridden_color;
     BlockColor color;
     Block(BlockColor color) : color(color) {}
+
+    void override_base_color(uint16_t c) {
+      overridden_color = color.base;
+      color.base = c;
+    }
+
+    void recover_base_color() {
+      color.base = *overridden_color;
+      overridden_color = std::nullopt;
+    }
 };
 
 class Board {
@@ -630,45 +652,29 @@ class YomoTetris_240x240 {
         // delete rows with animation
         auto [deletable_rows_exists, deletable] = board.deletable_rows();
         if (deletable_rows_exists) {
-          for (int i = 0; i < 20; i++) {
-            if (deletable[i]) {
-              board.delete_block(i, 4);
-              board.delete_block(i, 5);
+          for (int i = 0; i < 3; i++) {
+            // delete animation
+            // render flashed (white) lines
+            for (int row = 0; row < 20; row++) {
+              if (deletable[row]) {
+                for (int col = 0; col < 10; col++) {
+                  board.blocks[row][col]->override_base_color(TFT_WHITE);
+                }
+              }
             }
-          }
-          render();
-          delay(50);
-          for (int i = 0; i < 20; i++) {
-            if (deletable[i]) {
-              board.delete_block(i, 3);
-              board.delete_block(i, 6);
+            render();
+            delay(30);
+            // render original lines
+            for (int row = 0; row < 20; row++) {
+              if (deletable[row]) {
+                for (int col = 0; col < 10; col++) {
+                  board.blocks[row][col]->recover_base_color();
+                }
+              }
             }
+            render();
+            delay(30);
           }
-          render();
-          delay(50);
-          for (int i = 0; i < 20; i++) {
-            if (deletable[i]) {
-              board.delete_block(i, 2);
-              board.delete_block(i, 7);
-            }
-          }
-          render();
-          delay(50);
-          for (int i = 0; i < 20; i++) {
-            if (deletable[i]) {
-              board.delete_block(i, 1);
-              board.delete_block(i, 8);
-            }
-          }
-          render();
-          delay(50);
-          for (int i = 0; i < 20; i++) {
-            if (deletable[i]) {
-              board.delete_block(i, 0);
-              board.delete_block(i, 9);
-            }
-          }
-          render();
           board.clear_lines(deletable);
           render();
         }
@@ -709,6 +715,20 @@ class YomoTetris_240x240 {
         if (btns.SELECT) {
           if (!hold_once_tried && board.cur_mino_exists()) {
             hold_once_tried = true;
+
+            // flash animation
+            for (int i = 0; i < 3; i++) {
+              // render flashed (white) lines
+              board.cur_mino->override_base_color(TFT_WHITE);
+              if (hold_mino.has_value()) hold_mino->override_base_color(TFT_WHITE);
+              render();
+              delay(30);
+              // render original lines
+              board.cur_mino->recover_base_color();
+              if (hold_mino.has_value()) hold_mino->recover_base_color();
+              render();
+              delay(30);
+            }
 
             // temporary save current hold mino
             std::optional<Mino> temp = hold_mino;
@@ -894,6 +914,9 @@ class YomoTetris_240x240 {
 
     void render_hold_mino() {
         Mino m = Mino::for_hold_box(hold_mino->type);
+        // in case hold mino color is overridden. This is needed because this does not directly renders hold_mino but
+        // it creates a new Mino instance m. This is not a good design
+        m.color = hold_mino->color;
         int x_offset = m.is_I() ? 0 : m.is_O() ? hold_block_size : hold_block_size / 2;
         int y_offset = m.is_I() ? hold_block_size+(hold_block_size / 2) : hold_block_size*2;
         render_mino_on_hold_box(m, x_offset, y_offset);
