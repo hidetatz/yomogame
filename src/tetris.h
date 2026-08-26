@@ -487,6 +487,7 @@ class YomoTetris_240x240 {
     int move_cnt_while_lockdown_judging;
     boolean hold_once_tried;
 
+    int mino_placed;
     unsigned long game_started_at;
     int score;
     int removed_lines;
@@ -495,8 +496,6 @@ class YomoTetris_240x240 {
     int tetris_count;
     int tspins;
     int combos;
-    int tpm;
-    int lpm;
 
     Input input;
     uint16_t bgcolor;
@@ -521,6 +520,7 @@ class YomoTetris_240x240 {
       move_cnt_while_lockdown_judging(0),
       hold_once_tried(false),
 
+      mino_placed(0),
       game_started_at(0),
       score(0),
       removed_lines(0),
@@ -529,8 +529,6 @@ class YomoTetris_240x240 {
       tetris_count(0),
       tspins(0),
       combos(0),
-      tpm(0),
-      lpm(0),
 
       input(input),
       bgcolor(TFT_BLACK),
@@ -640,6 +638,10 @@ class YomoTetris_240x240 {
         render();
         delay(30);
       }
+      mino_placed++;
+      removed_lines += count;
+      if (count == 4) tetris_count++;
+
       board.clear_lines(rows, count);
     }
 
@@ -951,6 +953,22 @@ class YomoTetris_240x240 {
       snprintf(time, sizeof(time), "%02d:%02d:%02d", minutes, seconds, centis);
       render_right_label(time, stats_right_align, time_y, 1);
 
+      double elapsed_min = elapsed_ms / 60000.0;
+      float tpm = 0;
+      float lpm = 0;
+
+      if (elapsed_ms >= 5000) {
+        tpm = mino_placed / elapsed_min;
+        lpm = removed_lines / elapsed_min;
+        if (tpm > 999.9) tpm = 999.9;
+        if (lpm > 999.9) lpm = 999.9;
+      }
+
+      char tpm_str[6];
+      char lpm_str[6];
+      snprintf(tpm_str, sizeof(tpm_str), "%.1f", tpm);
+      snprintf(lpm_str, sizeof(lpm_str), "%.1f", lpm);
+
       // can display 5 chars (because of label on the same line)
       stats_sprite.fillRect(0, 0, 32, 98, bgcolor);
       render_right_label_sprite(stats_sprite, std::to_string(removed_lines).c_str(), 32, 0, 1);
@@ -959,8 +977,8 @@ class YomoTetris_240x240 {
       render_right_label_sprite(stats_sprite, std::to_string(tetris_count).c_str(), 32, 39, 1);
       render_right_label_sprite(stats_sprite, std::to_string(tspins).c_str(), 32, 52, 1);
       render_right_label_sprite(stats_sprite, std::to_string(combos).c_str(), 32, 65, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(tpm).c_str(), 32, 78, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(lpm).c_str(), 32, 91, 1);
+      render_right_label_sprite(stats_sprite, tpm_str, 32, 78, 1);
+      render_right_label_sprite(stats_sprite, lpm_str, 32, 91, 1);
       stats_sprite.pushSprite(27, lines_y);
     }
 };
