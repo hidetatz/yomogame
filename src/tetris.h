@@ -72,8 +72,16 @@ class Mino {
 
     Mino(MinoType type, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color(base_color, lighter_color, darker_color), positions(positions), pivot(pivot), type(type), cur_direction(direction) {}
 
-    static Mino from_type(MinoType type) {
-      return Mino::from_type_row_col(type, 0, type == MinoType::O || type == MinoType::Z ? 4 : 3);
+    static Mino for_board(MinoType type) {
+      return Mino::from_type_row_col(type, 0, type == MinoType::O ? 4 : 3);
+    }
+
+    static Mino for_next_minos(MinoType type) {
+      return Mino::from_type_row_col(type, 0, 0);
+    }
+
+    static Mino for_hold_box(MinoType type) {
+      return Mino::from_type_row_col(type, 0, 0);
     }
 
     static Mino from_type_row_col(MinoType type, int row, int col) {
@@ -83,7 +91,7 @@ class Mino {
       if (type == MinoType::L) return Mino(type, 62242, 62733, 37345, /* orange */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
       if (type == MinoType::J) return Mino(type, 8254, 29502, 4114, /* blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col)}}, Pivot(row, col+1), MinoDirection::NORTH);
       if (type == MinoType::S) return Mino(type, 6049, 28589, 3200, /* green */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col+1), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
-      /* if (type == MinoType::Z) */ return Mino(type, 63521, 64301, 36864, /* red */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col-1)}}, Pivot(row, col), MinoDirection::NORTH);
+      /* if (type == MinoType::Z) */ return Mino(type, 63521, 64301, 36864, /* red */ {{BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
     }
 
     void up(int distance) {
@@ -526,7 +534,7 @@ class YomoTetris_240x240 {
         shuffle_bag(next_bag);
         mino_idx = 0;
       }
-      return Mino::from_type(next);
+      return Mino::for_board(next);
     }
 
     MinoType next_mino_type(int offset) {
@@ -706,7 +714,7 @@ class YomoTetris_240x240 {
             std::optional<Mino> temp = hold_mino;
 
             // next hold mino is current mino
-            hold_mino = Mino::from_type(board.cur_mino->type);
+            hold_mino = Mino::for_board(board.cur_mino->type);
 
             // next mino is holded one if hold exists, else next_mino();
             Mino next = temp.has_value() ? *temp : next_mino();
@@ -804,6 +812,8 @@ class YomoTetris_240x240 {
       screen.drawFastVLine(top_left_x + width - 1, top_left_y + 1,          height - 2, TFT_WHITE); // top right to down
     }
 
+    /* string */
+
     void render_centered_label(const char *string, int x, int y, uint8_t font) {
       screen.setTextColor(TFT_WHITE, bgcolor);
       screen.setTextDatum(TC_DATUM);
@@ -828,78 +838,92 @@ class YomoTetris_240x240 {
       sprite.drawString(string, x, y, font);
     }
 
+    /* minos and blocks */
+
     void render_empty_block(TFT_eSprite& sprite, int row, int col, int block_size) {
       sprite.fillRect(col * block_size, row * block_size, block_size, block_size, bgcolor);
     }
 
-    void render_block(TFT_eSprite& sprite, int row, int col, int x_offset, int y_offset, int block_size, BlockColor color) {
-      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size,           block_size,           color.darker);
-      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size - bevel,   block_size - bevel,   color.lighter);
-      sprite.fillRect(x_offset + col * block_size + bevel, y_offset + row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, color.base);
+    void render_block(TFT_eSprite& sprite, int row, int col, int x_offset, int y_offset, int block_size, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color) {
+      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size,           block_size,           darker_color);
+      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size - bevel,   block_size - bevel,   lighter_color);
+      sprite.fillRect(x_offset + col * block_size + bevel, y_offset + row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, base_color);
     }
 
-    void render_ghost_block(TFT_eSprite& sprite, int row, int col, int block_size, int distance, BlockColor color) {
-      sprite.drawRect(col * block_size,     (row + distance) * block_size,     block_size,     block_size,     color.base);
-      sprite.drawRect(col * block_size + 1, (row + distance) * block_size + 1, block_size - 2, block_size - 2, color.base);
+    void render_ghost_block(TFT_eSprite& sprite, int row, int col, int block_size, uint16_t color) {
+      // render doubled lines for visibility
+      sprite.drawRect(col * block_size,     row * block_size,     block_size,     block_size,     color);
+      sprite.drawRect(col * block_size + 1, row * block_size + 1, block_size - 2, block_size - 2, color);
     }
 
-    void render_mino(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset, int block_size) {
-      for (int i = 0; i < 4; i++) {
-        render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, block_size, m.color);
+    void render_mino_on_sprite_with_offset(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset, int bs) {
+      for (int i = 0; i < 4; i++) render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, bs, m.color.base, m.color.lighter, m.color.darker);
+    }
+
+    void render_mino_on_board(Mino m) {
+      render_mino_on_sprite_with_offset(board_sprite, m, 0, 0, block_size);
+    }
+
+    void render_mino_on_next_minos(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset) {
+      render_mino_on_sprite_with_offset(sprite, m, x_offset, y_offset, next_minos_block_size);
+    }
+
+    void render_mino_on_hold_box(Mino m, int x_offset, int y_offset) {
+      render_mino_on_sprite_with_offset(hold_sprite, m, x_offset, y_offset, hold_block_size);
+    }
+
+    void render_ghost_mino_on_board(Mino m, int hard_drop_distance) {
+      for (int i = 0; i < 4; i++) render_ghost_block(board_sprite, m.positions[i].row+hard_drop_distance, m.positions[i].col, block_size, m.color.base);
+    }
+
+    void render_blocks_on_board() {
+      for (int row = 0; row < 20; row++) {
+        for (int col = 0; col < 10; col++) {
+          if (!board.block_exists(row, col)) render_empty_block(board_sprite, row, col, block_size);
+          else render_block(board_sprite, row, col, 0, 0, block_size, board.blocks[row][col]->color.base, board.blocks[row][col]->color.lighter, board.blocks[row][col]->color.darker);
+        }
       }
     }
 
-    void render_ghost_mino(TFT_eSprite& sprite, Mino m, int block_size, int distance) {
-      for (int i = 0; i < 4; i++) {
-        render_ghost_block(sprite, m.positions[i].row, m.positions[i].col, block_size, distance, m.color);
-      }
+    void render_next_mino(int num) {
+        Mino m = Mino::for_next_minos(next_mino_type(num));
+        int x_offset = m.is_I() ? 0 : m.is_O() ? next_minos_block_size : next_minos_block_size / 2;
+        int y_offset = m.is_I() ? (next_minos_block_size / 2) : next_minos_block_size;
+        render_mino_on_next_minos(next_minos_sprites[num], m, x_offset, y_offset);
+    }
+
+    void render_hold_mino() {
+        Mino m = Mino::for_hold_box(hold_mino->type);
+        int x_offset = m.is_I() ? 0 : m.is_O() ? hold_block_size : hold_block_size / 2;
+        int y_offset = m.is_I() ? hold_block_size+(hold_block_size / 2) : hold_block_size*2;
+        render_mino_on_hold_box(m, x_offset, y_offset);
     }
 
     void render() {
       board_sprite.fillSprite(bgcolor);
 
       // blocks
-      for (int row = 0; row < 20; row++) {
-        for (int col = 0; col < 10; col++) {
-          if (!board.block_exists(row, col)) {
-            render_empty_block(board_sprite, row, col, block_size);
-          } else {
-            for (int j = 0; j < 4; j++) {
-              render_block(board_sprite, row, col, 0, 0, block_size, board.blocks[row][col]->color);
-            }
-          }
-        }
-      }
+      render_blocks_on_board();
 
       // ghosts and current mino
       if (board.cur_mino_exists()) {
-        render_ghost_mino(board_sprite, *board.cur_mino, block_size, board.hard_drop_distance());
-        render_mino(board_sprite, *board.cur_mino, 0, 0, block_size);
+        render_ghost_mino_on_board(*board.cur_mino, board.hard_drop_distance());
+        render_mino_on_board(*board.cur_mino);
       }
 
       board_sprite.pushSprite(board_grid_top_left_x+1, board_grid_top_left_y+1);
 
       // next minos
-      for (int s = 0; s < 6; s++) {
-        next_minos_sprites[s].fillSprite(bgcolor);
-        MinoType t = next_mino_type(s);
-        Mino m = Mino::from_type_row_col(t, t == MinoType::I ? 0 : 1, t == MinoType::Z ? 1 : 0);
-        int x = m.is_I() ? 0 : m.is_O() ? next_minos_block_size : next_minos_block_size / 2;
-        int y = m.is_I() ? next_minos_block_size / 2 : 0;
-
-        render_mino(next_minos_sprites[s], m, x, y, next_minos_block_size);
-        next_minos_sprites[s].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (next_minos_block_size * 2 + next_minos_between_margin) * s);
+      for (int i = 0; i < 6; i++) {
+        next_minos_sprites[i].fillSprite(bgcolor);
+        render_next_mino(i);
+        next_minos_sprites[i].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (next_minos_block_size * 2 + next_minos_between_margin) * i);
       }
 
       // hold
       hold_sprite.fillSprite(bgcolor);
       if (hold_mino.has_value()) {
-        MinoType t = hold_mino->type;
-        Mino m = Mino::from_type_row_col(t, t == MinoType::I ? 0 : 1, t == MinoType::Z ? 1 : 0);
-        int x = m.is_I() ? 0 : m.is_O() ? hold_block_size : hold_block_size / 2;
-        int y = m.is_I() ? hold_block_size + hold_block_size / 2 : hold_block_size;
-
-        render_mino(hold_sprite, m, x, y, hold_block_size);
+        render_hold_mino();
         hold_sprite.pushSprite(1 + hold_grid_top_left_x + hold_left_margin, 1 + hold_grid_top_left_y + hold_top_margin);
       }
 
