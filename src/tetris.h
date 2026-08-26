@@ -598,6 +598,15 @@ class YomoTetris_240x240 {
       return true;
     }
 
+    void pop_new_mino_if_needed(unsigned long now) {
+      if (board.cur_mino_exists()) return;
+      Mino m = next_mino();
+      if (!try_place_mino(m, now)) {
+        Serial.println("Game over!");
+        while (true) delay(1000);
+      }
+    }
+
     void lock_mino_and_clear_lines() {
       board.lockdown_mino();
       if (hold_once_tried) hold_once_tried = false;
@@ -670,32 +679,19 @@ class YomoTetris_240x240 {
       unsigned long last_soft_dropped = 0;
       boolean horizontal_auto_repeat_started = false;
 
-      boolean was_up = false;
-      boolean was_down = false;
-      boolean was_a = false;
-      boolean was_b = false;
-      boolean was_right = false;
-      boolean was_left = false;
+      ButtonState prev_input;
 
       game_started_at = millis();
 
       while (true) {
         unsigned long now = millis();
-
-        // new mino pop
-        if (!board.cur_mino_exists()) {
-          Mino m = next_mino();
-          if (!try_place_mino(m, now)) {
-            Serial.println("Game over!");
-            while (true) delay(1000);
-          }
-        }
-
         ButtonState btns = input.get();
 
-        // hard drop
-        if (btns.UP && !was_up) {
-          was_up = true;
+        // pop mino
+        pop_new_mino_if_needed(now);
+
+        // check hard drop
+        if (btns.UP && !prev_input.UP) {
           int i = 0;
           // animation
           while (try_move(MoveDirection::DOWN, 1, now)) {
@@ -704,9 +700,8 @@ class YomoTetris_240x240 {
           }
           render();
           lock_mino_and_clear_lines();
-          continue; // need to continue to pop the new mino
+          pop_new_mino_if_needed(now);
         }
-        was_up = btns.UP;
 
         // hold
         // because R button does not exist, uses SELECT press as hold
@@ -745,10 +740,8 @@ class YomoTetris_240x240 {
         }
 
         // rotation
-        if (btns.A && !was_a) try_rotate(RotateDirection::CLOCKWISE, now);
-        else if (btns.B && !was_b) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
-        was_a = btns.A;
-        was_b = btns.B;
+        if (btns.A && !prev_input.A) try_rotate(RotateDirection::CLOCKWISE, now);
+        else if (btns.B && !prev_input.B) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
 
         // softdrop
         if (btns.DOWN) {
@@ -756,12 +749,11 @@ class YomoTetris_240x240 {
           boolean soft_drop_interval_passed = (now - last_soft_dropped) >= FREE_FALL_MS / 20;
 
           // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
-          if (!was_down || soft_drop_interval_passed) {
+          if (!prev_input.DOWN || soft_drop_interval_passed) {
             try_move(MoveDirection::DOWN, 1, now);
             last_soft_dropped = now;
           }
         }
-        was_down = btns.DOWN;
 
         // free fall
         if (now - free_fall_timer >= FREE_FALL_MS) {
@@ -775,7 +767,7 @@ class YomoTetris_240x240 {
           if (btns.RIGHT && btns.LEFT) {
             // on both pressed, do nothing
 
-          } else if ((btns.RIGHT && !was_right) || (btns.LEFT && !was_left)) {
+          } else if ((btns.RIGHT && !prev_input.RIGHT) || (btns.LEFT && !prev_input.LEFT)) {
             // when horizontal press changed, just move
             try_move(dir, 1, now);
             horizontal_auto_repeat_started = false;
@@ -794,8 +786,6 @@ class YomoTetris_240x240 {
             }
           }
         }
-        was_right = btns.RIGHT;
-        was_left = btns.LEFT;
 
         if (board.mino_landed()) {
           if (!lockdown_judging) lockdown_judging = true;
@@ -810,6 +800,7 @@ class YomoTetris_240x240 {
         }
 
         render();
+        prev_input = btns;
       }
     }
 
