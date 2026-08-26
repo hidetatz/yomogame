@@ -1,4 +1,5 @@
 #pragma once
+
 #include <array>
 #include <optional>
 #include <tuple>
@@ -9,8 +10,6 @@
 #include <TFT_eSPI.h>
 
 #include <input.h>
-
-#define LOGF(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
 
 /*
  * Mino and Board
@@ -39,12 +38,37 @@ class BlockPos {
     void left(int distance) { col -= distance; }
 };
 
+class Block {
+  public:
+    std::optional<uint16_t> overridden_color;
+    BlockColor color;
+    Block(BlockColor color) : color(color) {}
+
+    void override_base_color(uint16_t c) {
+      overridden_color = color.base;
+      color.base = c;
+    }
+
+    void recover_base_color() {
+      color.base = *overridden_color;
+      overridden_color = std::nullopt;
+    }
+};
+
 enum class MinoDirection {
   NORTH, EAST, SOUTH, WEST
 };
 
+enum class MoveDirection {
+  UP, DOWN, LEFT, RIGHT
+};
+
 enum class RotateDirection {
   CLOCKWISE, COUNTER_CLOCKWISE
+};
+
+enum class MinoType {
+  O, I, T, L, J, S, Z
 };
 
 class Pivot {
@@ -56,10 +80,6 @@ class Pivot {
     void down(int distance) { row += distance; }
     void right(int distance) { col += distance; }
     void left(int distance) { col -= distance; }
-};
-
-enum class MinoType {
-  O, I, T, L, J, S, Z
 };
 
 class Mino {
@@ -251,28 +271,6 @@ class Mino {
     }
 };
 
-
-enum class MoveDirection {
-  UP, DOWN, LEFT, RIGHT
-};
-
-class Block {
-  public:
-    std::optional<uint16_t> overridden_color;
-    BlockColor color;
-    Block(BlockColor color) : color(color) {}
-
-    void override_base_color(uint16_t c) {
-      overridden_color = color.base;
-      color.base = c;
-    }
-
-    void recover_base_color() {
-      color.base = *overridden_color;
-      overridden_color = std::nullopt;
-    }
-};
-
 class Board {
   public:
     std::optional<Mino> cur_mino;
@@ -421,7 +419,6 @@ class Board {
  *
  * This currently depends on 240x240 TFT screen.
  */
-
 
 const int block_size = 11;
 const int bevel = 2;
@@ -700,6 +697,7 @@ class YomoTetris_240x240 {
         if (btns.UP && !was_up) {
           was_up = true;
           int i = 0;
+          // animation
           while (try_move(MoveDirection::DOWN, 1, now)) {
             i++;
             if(i % 3 == 0) render();
@@ -747,11 +745,8 @@ class YomoTetris_240x240 {
         }
 
         // rotation
-        if (btns.A && !was_a) {
-          try_rotate(RotateDirection::CLOCKWISE, now);
-        } else if (btns.B && !was_b) {
-          try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
-        }
+        if (btns.A && !was_a) try_rotate(RotateDirection::CLOCKWISE, now);
+        else if (btns.B && !was_b) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
         was_a = btns.A;
         was_b = btns.B;
 
