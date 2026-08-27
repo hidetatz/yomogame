@@ -455,37 +455,28 @@ struct DisplayParameters {
   int hold_mino_left_margin;
 
   // score
-  int score_label_font;
-  int score_label_font_height;
+  int score_font;
+  int score_font_height;
   int score_label_top_margin;
   int score_label_left_margin;
-  int score_font;
-  int score_font_width;
-  int score_font_height;
   int score_top_margin;
 
   // time
-  int time_label_font;
-  int time_label_font_height;
+  int time_font;
+  int time_font_height;
   int time_label_top_margin;
   int time_label_left_margin;
-  int time_font;
-  int time_font_width;
-  int time_font_height;
   int time_top_margin;
 
   // else stats; use sprite on values
-  int stats_label_font;
-  int stats_label_chars_count;
-  int stats_label_font_width;
-  int stats_label_font_height;
-  int stats_label_top_margin;
-  int stats_label_left_margin;
   int stats_font;
+  int stats_label_chars_count;
+  int stats_label_left_margin;
   int stats_font_width;
   int stats_font_height;
   int stats_top_margin;
   int stats_left_margin;
+  int stats_between_margin;
 
   // board
   int board_mino_block_size;
@@ -504,77 +495,71 @@ struct DisplayParameters {
   int next_minos_mino_top_margin;
   int next_minos_mino_left_margin;
 
-  int hold_label_top_center_pos_x() {
-    return hold_box_left_margin + ((hold_box_width() + 2) / 2);
-  }
+  int hold_box_width() { return 2 + hold_mino_left_margin * 2 + hold_mino_block_size * 4; } // include line pixel
+  int hold_box_height() { return 2 + hold_mino_top_margin * 2 + hold_mino_block_size * 4; } // include line pixel
+  int hold_box_x_start() { return hold_box_left_margin; }
+  int hold_box_x_end() { return hold_box_x_start() + hold_box_width(); }
+  int hold_box_y_start() { return hold_label_top_margin + hold_label_font_height + hold_box_top_margin; }
+  int hold_box_y_end() { return hold_box_y_start() + hold_box_height(); }
+  int hold_label_top_center_pos_x_start() { return hold_box_x_start() + ((hold_box_width()) / 2); }
+  int hold_label_top_center_pos_y_start() { return hold_label_top_margin; }
+  int hold_sprite_width() { return hold_mino_block_size * 4; }
+  int hold_sprite_height() { return hold_mino_block_size * 4; }
+  int hold_mino_sprite_x_start() { return hold_box_x_start() + 1 + hold_mino_left_margin; }
+  int hold_mino_sprite_y_start() { return hold_box_y_start() + 1 + hold_mino_top_margin; }
 
-  int hold_label_top_center_pos_y() {
-    return hold_label_top_margin;
-  }
+  int score_time_x_end() { return board_box_x_start() - board_left_margin; }
 
-  int hold_box_x() {
-    return hold_box_left_margin;
-  }
+  int score_label_x_start() { return score_label_left_margin; }
+  int score_label_y_start() { return hold_box_y_end() + score_label_top_margin; }
+  int score_label_y_end() { return score_label_y_start() + score_font_height; }
+  int score_y_start() { return score_label_y_end() + score_top_margin; }
+  int score_y_end() { return score_y_start() + score_font_height; }
 
-  int hold_box_y() {
-    return hold_label_top_margin + hold_label_font_height + hold_box_top_margin;
-  }
+  int time_label_x_start() { return time_label_left_margin; }
+  int time_label_y_start() { return score_y_end() + time_label_top_margin; }
+  int time_label_y_end() { return time_label_y_start() + time_font_height; }
+  int time_y_start() { return time_label_y_end() + time_top_margin; }
+  int time_y_end() { return time_y_start() + time_font_height; }
 
-  // do not include line pixel
-  int hold_box_width() {
-    return hold_mino_left_margin * 2 + hold_mino_block_size * 4;
-  }
+  int stats_label_x_start() { return stats_label_left_margin; }
+  int stats_label_x_end() { return stats_label_x_start() + (stats_label_chars_count * stats_font_width + stats_label_chars_count - 1); }
 
-  int hold_box_height() {
-    return hold_mino_top_margin * 2 + hold_mino_block_size * 4;
-  }
+  int statvals_sprite_width() { return score_time_x_end() - statvals_x_start(); }
+  int statvals_sprite_height() { return stats_font_height * 7 + stats_top_margin * 6; } // in all modes there are 7 stats shown
+  int statvals_chars_count() { return statvals_sprite_width() + 1 / (stats_font_width + 1); }
+  int statvals_x_start() { return stats_label_x_end() + stats_left_margin; }
+  int statvals_y_start() { return time_y_end() + stats_top_margin; }
+  int statvals_x_end_in_sprite() { return statvals_sprite_width(); }
 
-  int hold_mino_x_in_hold_box_sprite() {
-    return hold_box_left_margin + 1 + hold_mino_left_margin;
-  }
-
-  int hold_mino_y_in_hold_box_sprite() {
-    return hold_box_y() + 1 + hold_mino_top_margin;
-  }
-
-  int stats_x_right_align() { return board_box_x() - board_left_margin; }
-
-  int score_label_x() { return score_label_left_margin; }
-  int score_label_y() { return hold_box_y() + hold_box_height() + 2 + score_label_top_margin; }
-  int score_y() { return score_label_y() + score_label_font_height + score_top_margin; }
-
-  int time_label_x() { return time_label_left_margin; }
-  int time_label_y() { return score_y() + score_font_height + time_label_top_margin; }
-  int time_y() { return time_label_y() + time_label_font_height + time_top_margin; }
-
-  int stats_sprite_width() {
-    return stats_x_right_align() - stats_start_x();
-  }
-
-  int stats_sprite_height(int stats_cnt) {
-    return stats_font_height * stats_cnt + stats_top_margin * (stats_cnt-1);
-  }
-
-  int stats_chars_count() {
-    int width = stats_sprite_width();
-    // when k chars, required width is k * char_width + (k-1) * between_width (1).
-    // k * c + (k-1) <= width -> k <= (n + 1) / (c + 1)
-    // so, k = floor((n + 1) / (c + 1))
-    return width + 1 / (stats_font_width + 1);
-  }
-
-  int stats_start_x() {
-    int label_size = stats_label_chars_count * stats_label_font_width + stats_label_font_width - 1;
-    return stats_label_left_margin + label_size + stats_left_margin;
-  }
-  int stats_start_y() { return time_y() + time_font_height + stats_top_margin; }
-
-  int stats_label_x() { return stats_label_left_margin; }
-
-  int stats_x_right_align_in_sprite() { return stats_sprite_width(); }
-  int stats_y(int idx) { return stats_start_y() + stats_y_in_sprite(idx); }
-  int stats_y_in_sprite(int idx) { return (stats_top_margin + stats_font_height) * idx; }
-
+  int stats0_y_start() { return time_y_end() + stats_top_margin; }
+  int stats0_y_end() { return stats0_y_start() + stats_font_height; }
+  int stats1_y_start() { return stats0_y_end() + stats_between_margin; }
+  int stats1_y_end() { return stats1_y_start() + stats_font_height; }
+  int stats2_y_start() { return stats1_y_end() + stats_between_margin; }
+  int stats2_y_end() { return stats2_y_start() + stats_font_height; }
+  int stats3_y_start() { return stats2_y_end() + stats_between_margin; }
+  int stats3_y_end() { return stats3_y_start() + stats_font_height; }
+  int stats4_y_start() { return stats3_y_end() + stats_between_margin; }
+  int stats4_y_end() { return stats4_y_start() + stats_font_height; }
+  int stats5_y_start() { return stats4_y_end() + stats_between_margin; }
+  int stats5_y_end() { return stats5_y_start() + stats_font_height; }
+  int stats6_y_start() { return stats5_y_end() + stats_between_margin; }
+  int stats6_y_end() { return stats6_y_start() + stats_font_height; }
+  int stats0_y_start_in_sprite() { return 0; }
+  int stats0_y_end_in_sprite() { return stats0_y_start_in_sprite() + stats_font_height; }
+  int stats1_y_start_in_sprite() { return stats0_y_end_in_sprite() + stats_between_margin; }
+  int stats1_y_end_in_sprite() { return stats1_y_start_in_sprite() + stats_font_height; }
+  int stats2_y_start_in_sprite() { return stats1_y_end_in_sprite() + stats_between_margin; }
+  int stats2_y_end_in_sprite() { return stats2_y_start_in_sprite() + stats_font_height; }
+  int stats3_y_start_in_sprite() { return stats2_y_end_in_sprite() + stats_between_margin; }
+  int stats3_y_end_in_sprite() { return stats3_y_start_in_sprite() + stats_font_height; }
+  int stats4_y_start_in_sprite() { return stats3_y_end_in_sprite() + stats_between_margin; }
+  int stats4_y_end_in_sprite() { return stats4_y_start_in_sprite() + stats_font_height; }
+  int stats5_y_start_in_sprite() { return stats4_y_end_in_sprite() + stats_between_margin; }
+  int stats5_y_end_in_sprite() { return stats5_y_start_in_sprite() + stats_font_height; }
+  int stats6_y_start_in_sprite() { return stats5_y_end_in_sprite() + stats_between_margin; }
+  int stats6_y_end_in_sprite() { return stats6_y_start_in_sprite() + stats_font_height; }
   std::string lines_label() { return stats_label_chars_count == 3 ? "LNS" : "L"; }
   std::string level_label() { return stats_label_chars_count == 3 ? "LVL" : "V"; }
   std::string goal_label() { return stats_label_chars_count == 3 ? "GOL" : "G"; }
@@ -584,41 +569,38 @@ struct DisplayParameters {
   std::string tpm_label() { return stats_label_chars_count == 3 ? "TPM" : "P"; }
   std::string lpm_label() { return stats_label_chars_count == 3 ? "LPM" : "C"; }
 
-  int board_box_x() { return (screen_width - (board_mino_block_size * 10 + 2)) / 2; }
-  int board_box_y() { return board_top_margin; }
+  int board_box_width() { return 2 + board_sprite_width(); }
+  int board_box_height() { return 2 + board_sprite_height(); }
+  int board_box_x_start() { return (screen_width - board_box_width()) / 2; }
+  int board_box_x_end() { return board_box_x_start() + board_box_width() - 1; }
+  int board_box_y_start() { return board_top_margin; }
+  int board_box_y_end() { return board_box_y_start() + board_box_height(); }
+  int board_sprite_width() { return board_mino_block_size * 10; }
+  int board_sprite_height() { return board_mino_block_size * 20; }
+  int board_sprite_x_start() { return board_box_x_start() + 1; }
+  int board_sprite_y_start() { return board_box_y_start() + 1; }
 
-  int board_box_x_right() { return board_box_x() + board_mino_block_size * 10 + 1; }
-
-  int next_minos_box_x() {
-    return board_box_x_right() + next_minos_box_left_margin;
-  }
-
-  int next_minos_box_y() {
-    return next_minos_label_top_margin + next_minos_label_font_height + next_minos_box_top_margin;
-  }
-
-  int next_minos_box_width() {
-    return next_minos_mino_left_margin * 2 + next_minos_mino_block_size * 4;
-  }
-  int next_minos_box_height() {
-    return next_minos_mino_top_margin * 7 + next_minos_mino_block_size * 2 * 6;
-  }
-
-  int next_minos_label_top_center_pos_x() {
-    return next_minos_box_x() + ((next_minos_box_width() + 2) / 2);
-  }
-
-  int next_minos_label_top_center_pos_y() {
-    return next_minos_label_top_margin;
-  }
-
-  int next_minos_x_in_next_minos_box_sprite() {
-    return next_minos_box_x() + 1 + next_minos_mino_left_margin;
-  }
-
-  int next_minos_y_in_next_minos_box_sprite(int idx) {
-    return next_minos_box_y() + 1 + next_minos_mino_top_margin + (next_minos_mino_top_margin+next_minos_mino_block_size*2) * idx;
-  }
+  int next_minos_box_width() { return 2 + next_minos_mino_left_margin * 2 + next_minos_mino_block_size * 4; }
+  int next_minos_box_height() { return 2 + next_minos_mino_top_margin * 7 + next_minos_mino_block_size * 2 * 6; }
+  int next_minos_box_x_start() { return board_box_x_end() + next_minos_box_left_margin; }
+  int next_minos_box_y_start() { return next_minos_label_top_margin + next_minos_label_font_height + next_minos_box_top_margin; }
+  int next_minos_label_top_center_pos_x() { return next_minos_box_x_start() + next_minos_box_width() / 2; }
+  int next_minos_label_top_center_pos_y() { return next_minos_label_top_margin; }
+  int next_minos_sprite_width() { return next_minos_mino_block_size * 4; }
+  int next_minos_sprite_height() { return next_minos_mino_block_size * 2; }
+  int next_minos_sprite_x_start() { return next_minos_box_x_start() + next_minos_mino_left_margin; }
+  int next_minos_sprite0_y_start() { return next_minos_box_y_start() + next_minos_mino_top_margin; }
+  int next_minos_sprite0_y_end() { return next_minos_sprite0_y_start() + next_minos_sprite_height(); }
+  int next_minos_sprite1_y_start() { return next_minos_sprite0_y_end() + next_minos_mino_top_margin; }
+  int next_minos_sprite1_y_end() { return next_minos_sprite1_y_start() + next_minos_sprite_height(); }
+  int next_minos_sprite2_y_start() { return next_minos_sprite1_y_end() + next_minos_mino_top_margin; }
+  int next_minos_sprite2_y_end() { return next_minos_sprite2_y_start() + next_minos_sprite_height(); }
+  int next_minos_sprite3_y_start() { return next_minos_sprite2_y_end() + next_minos_mino_top_margin; }
+  int next_minos_sprite3_y_end() { return next_minos_sprite3_y_start() + next_minos_sprite_height(); }
+  int next_minos_sprite4_y_start() { return next_minos_sprite3_y_end() + next_minos_mino_top_margin; }
+  int next_minos_sprite4_y_end() { return next_minos_sprite4_y_start() + next_minos_sprite_height(); }
+  int next_minos_sprite5_y_start() { return next_minos_sprite4_y_end() + next_minos_mino_top_margin; }
+  int next_minos_sprite5_y_end() { return next_minos_sprite5_y_start() + next_minos_sprite_height(); }
 };
 
 const DisplayParameters disp_param_240x240 {
@@ -637,36 +619,28 @@ const DisplayParameters disp_param_240x240 {
   .hold_mino_left_margin = 4,
 
   // score
-  .score_label_font = 1,
-  .score_label_font_height = 7,
+  .score_font = 1,
+  .score_font_height = 7,
   .score_label_top_margin = 11,
   .score_label_left_margin = 5,
-  .score_font = 1,
-  .score_font_width = 5,
-  .score_font_height = 7,
   .score_top_margin = 6,
 
   // time
-  .time_label_font = 1,
-  .time_label_font_height = 7,
+  .time_font = 1,
+  .time_font_height = 7,
   .time_label_top_margin = 6,
   .time_label_left_margin = 5,
-  .time_font = 1,
-  .time_font_width = 5,
-  .time_font_height = 7,
   .time_top_margin = 6,
 
   // else stats; use sprite on values
-  .stats_label_font = 1,
-  .stats_label_chars_count = 3,
-  .stats_label_font_width = 5,
-  .stats_label_font_height = 7,
-  .stats_label_left_margin = 5,
   .stats_font = 1,
+  .stats_label_chars_count = 3,
+  .stats_label_left_margin = 5,
   .stats_font_width = 5,
   .stats_font_height = 7,
-  .stats_top_margin = 6,
+  .stats_top_margin = 12,
   .stats_left_margin = 6,
+  .stats_between_margin = 6,
 
   // board
   .board_mino_block_size = 11,
@@ -699,9 +673,15 @@ enum class TSpinKind {
   TSPIN, TSPIN_MINI, NONE
 };
 
+enum class TetrisMode {
+  Endless, L40, L150, L999
+};
+
 class YomoTetris {
   public:
     DisplayParameters dp;
+
+    TetrisMode mode;
 
     std::array<MinoType, 7> cur_bag;
     std::array<MinoType, 7> next_bag;
@@ -731,26 +711,24 @@ class YomoTetris {
     int combos;
     boolean in_b2b;
 
-    boolean disp_lines;
-    boolean disp_level;
-    boolean disp_goal;
-    boolean disp_tetris;
-    boolean disp_tspins;
-    boolean disp_combos;
-    boolean disp_tpm;
-    boolean disp_lpm;
-
     Input input;
     uint16_t bgcolor;
     TFT_eSPI &screen;
     TFT_eSprite board_sprite;
-    std::array<TFT_eSprite, 6> next_minos_sprites;
+    TFT_eSprite next_minos_sprite0;
+    TFT_eSprite next_minos_sprite1;
+    TFT_eSprite next_minos_sprite2;
+    TFT_eSprite next_minos_sprite3;
+    TFT_eSprite next_minos_sprite4;
+    TFT_eSprite next_minos_sprite5;
     TFT_eSprite hold_sprite;
     TFT_eSprite stats_sprite;
 
   public:
     YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
       dp(params),
+
+      mode(TetrisMode::Endless),
 
       cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
@@ -778,20 +756,16 @@ class YomoTetris {
       combos(-1), // combos starts count when 2 consecutive clear happens, and it is counted as "1 combo", so it's good to start with -1
       in_b2b(false),
 
-      disp_lines(true),
-      disp_level(true),
-      disp_goal(true),
-      disp_tetris(true),
-      disp_tspins(true),
-      disp_combos(true),
-      disp_tpm(true),
-      disp_lpm(true),
-
       input(input),
       bgcolor(TFT_BLACK),
       screen(screen),
       board_sprite(&screen),
-      next_minos_sprites{TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen), TFT_eSprite(&screen)},
+      next_minos_sprite0(&screen),
+      next_minos_sprite1(&screen),
+      next_minos_sprite2(&screen),
+      next_minos_sprite3(&screen),
+      next_minos_sprite4(&screen),
+      next_minos_sprite5(&screen),
       hold_sprite(&screen),
       stats_sprite(&screen)
       {
@@ -1040,69 +1014,39 @@ class YomoTetris {
 
     void start() {
       /* hold area */
-      hold_sprite.createSprite(4 * dp.hold_mino_block_size, 4 * dp.hold_mino_block_size);
-      render_square(dp.hold_box_x(), dp.hold_box_y(), dp.hold_box_width()+2, dp.hold_box_height()+2);
-      render_centered_label("Hold", dp.hold_label_top_center_pos_x(), dp.hold_label_top_center_pos_y(), dp.hold_label_font);
+      hold_sprite.createSprite(dp.hold_sprite_width(), dp.hold_sprite_height());
+      render_square(dp.hold_box_x_start(), dp.hold_box_y_start(), dp.hold_box_width(), dp.hold_box_height());
+      render_centered_label("Hold", dp.hold_label_top_center_pos_x_start(), dp.hold_label_top_center_pos_y_start(), dp.hold_label_font);
 
       /* score area */
-      render_left_label("Score", dp.score_label_x(), dp.score_label_y(), dp.score_label_font);
+      render_left_label("Score", dp.score_label_x_start(), dp.score_label_y_start(), dp.score_font);
 
       /* time area */
-      render_left_label("Time", dp.time_label_x(), dp.time_label_y(), dp.time_label_font);
+      render_left_label("Time", dp.time_label_x_start(), dp.time_label_y_start(), dp.time_font);
 
-      /* stats area */
-      int stats_cnt = 0;
-      if (disp_lines) stats_cnt++;
-      if (disp_level) stats_cnt++;
-      if (disp_goal) stats_cnt++;
-      if (disp_tetris) stats_cnt++;
-      if (disp_tspins) stats_cnt++;
-      if (disp_combos) stats_cnt++;
-      if (disp_tpm) stats_cnt++;
-      if (disp_lpm) stats_cnt++;
-      stats_sprite.createSprite(dp.stats_sprite_width(), dp.stats_sprite_height(stats_cnt));
-
-      int stats_idx = 0;
-      if (disp_lines) {
-        render_left_label(dp.lines_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_level) {
-        render_left_label(dp.level_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_goal) {
-        render_left_label(dp.goal_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_tetris) {
-        render_left_label(dp.tetris_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_tspins) {
-        render_left_label(dp.tspins_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_combos) {
-        render_left_label(dp.combos_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_tpm) {
-        render_left_label(dp.tpm_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_lpm) {
-        render_left_label(dp.lpm_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
+      /* stats labels area */
+      stats_sprite.createSprite(dp.statvals_sprite_width(), dp.statvals_sprite_height());
+      std::string lbl = mode == TetrisMode::Endless ? dp.lines_label() : dp.goal_label();
+      render_left_label(lbl,               dp.stats_label_x_start(), dp.stats0_y_start(), dp.stats_font);
+      render_left_label(dp.level_label(),  dp.stats_label_x_start(), dp.stats1_y_start(), dp.stats_font);
+      render_left_label(dp.tetris_label(), dp.stats_label_x_start(), dp.stats2_y_start(), dp.stats_font);
+      render_left_label(dp.tspins_label(), dp.stats_label_x_start(), dp.stats3_y_start(), dp.stats_font);
+      render_left_label(dp.combos_label(), dp.stats_label_x_start(), dp.stats4_y_start(), dp.stats_font);
+      render_left_label(dp.tpm_label(),    dp.stats_label_x_start(), dp.stats5_y_start(), dp.stats_font);
+      render_left_label(dp.lpm_label(),    dp.stats_label_x_start(), dp.stats6_y_start(), dp.stats_font);
 
       /* board area */
-      board_sprite.createSprite(10 * dp.board_mino_block_size, 20 * dp.board_mino_block_size);
-      render_square(dp.board_box_x(), dp.board_box_y(), dp.board_mino_block_size * 10 + 2, dp.board_mino_block_size * 20 + 2);
+      board_sprite.createSprite(dp.board_sprite_width(), dp.board_sprite_height());
+      render_square(dp.board_box_x_start(), dp.board_box_y_start(), dp.board_box_width(), dp.board_box_height());
 
       /* next_minos area */
-      for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(dp.next_minos_mino_block_size * 4, dp.next_minos_mino_block_size * 2);
-      render_square(dp.next_minos_box_x(), dp.next_minos_box_y(), dp.next_minos_box_width()+2, dp.next_minos_box_height()+2);
+      next_minos_sprite0.createSprite(dp.next_minos_sprite_width(), dp.next_minos_sprite_height());
+      next_minos_sprite1.createSprite(dp.next_minos_sprite_width(), dp.next_minos_sprite_height());
+      next_minos_sprite2.createSprite(dp.next_minos_sprite_width(), dp.next_minos_sprite_height());
+      next_minos_sprite3.createSprite(dp.next_minos_sprite_width(), dp.next_minos_sprite_height());
+      next_minos_sprite4.createSprite(dp.next_minos_sprite_width(), dp.next_minos_sprite_height());
+      next_minos_sprite5.createSprite(dp.next_minos_sprite_width(), dp.next_minos_sprite_height());
+      render_square(dp.next_minos_box_x_start(), dp.next_minos_box_y_start(), dp.next_minos_box_width(), dp.next_minos_box_height());
       render_centered_label("Next", dp.next_minos_label_top_center_pos_x(), dp.next_minos_label_top_center_pos_y(), dp.next_minos_label_font);
 
       /* yomogi area */
@@ -1326,20 +1270,25 @@ class YomoTetris {
     }
 
     void render_next_mino(int num) {
-        Mino m = Mino::for_next_minos(next_mino_type(num));
-        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.next_minos_mino_block_size : dp.next_minos_mino_block_size / 2;
-        int y_offset = m.is_I() ? (dp.next_minos_mino_block_size / 2) : dp.next_minos_mino_block_size;
-        render_mino_on_next_minos(next_minos_sprites[num], m, x_offset, y_offset);
+      Mino m = Mino::for_next_minos(next_mino_type(num));
+      int x_offset = m.is_I() ? 0 : m.is_O() ? dp.next_minos_mino_block_size : dp.next_minos_mino_block_size / 2;
+      int y_offset = m.is_I() ? (dp.next_minos_mino_block_size / 2) : dp.next_minos_mino_block_size;
+      if (num == 0) render_mino_on_next_minos(next_minos_sprite0, m, x_offset, y_offset);
+      if (num == 1) render_mino_on_next_minos(next_minos_sprite1, m, x_offset, y_offset);
+      if (num == 2) render_mino_on_next_minos(next_minos_sprite2, m, x_offset, y_offset);
+      if (num == 3) render_mino_on_next_minos(next_minos_sprite3, m, x_offset, y_offset);
+      if (num == 4) render_mino_on_next_minos(next_minos_sprite4, m, x_offset, y_offset);
+      if (num == 5) render_mino_on_next_minos(next_minos_sprite5, m, x_offset, y_offset);
     }
 
     void render_hold_mino() {
-        Mino m = Mino::for_hold_box(hold_mino->type);
-        // in case hold mino color is overridden. This is needed because this does not directly renders hold_mino but
-        // it creates a new Mino instance m. This is not a good design
-        m.color = hold_mino->color;
-        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
-        int y_offset = m.is_I() ? dp.hold_mino_block_size+(dp.hold_mino_block_size / 2) : dp.hold_mino_block_size*2;
-        render_mino_on_hold_box(m, x_offset, y_offset);
+      Mino m = Mino::for_hold_box(hold_mino->type);
+      // in case hold mino color is overridden. This is needed because this does not directly renders hold_mino but
+      // it creates a new Mino instance m. This is not a good design
+      m.color = hold_mino->color;
+      int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
+      int y_offset = m.is_I() ? dp.hold_mino_block_size+(dp.hold_mino_block_size / 2) : dp.hold_mino_block_size*2;
+      render_mino_on_hold_box(m, x_offset, y_offset);
     }
 
     void render() {
@@ -1354,24 +1303,37 @@ class YomoTetris {
         render_mino_on_board(*board.cur_mino);
       }
 
-      board_sprite.pushSprite(dp.board_box_x()+1, dp.board_box_y()+1);
+      board_sprite.pushSprite(dp.board_sprite_x_start(), dp.board_sprite_y_start());
 
       // next minos
-      for (int i = 0; i < 6; i++) {
-        next_minos_sprites[i].fillSprite(bgcolor);
-        render_next_mino(i);
-        next_minos_sprites[i].pushSprite(dp.next_minos_x_in_next_minos_box_sprite(), dp.next_minos_y_in_next_minos_box_sprite(i));
-      }
+      next_minos_sprite0.fillSprite(bgcolor);
+      render_next_mino(0);
+      next_minos_sprite0.pushSprite(dp.next_minos_sprite_x_start(), dp.next_minos_sprite0_y_start());
+      next_minos_sprite1.fillSprite(bgcolor);
+      render_next_mino(1);
+      next_minos_sprite1.pushSprite(dp.next_minos_sprite_x_start(), dp.next_minos_sprite1_y_start());
+      next_minos_sprite2.fillSprite(bgcolor);
+      render_next_mino(2);
+      next_minos_sprite2.pushSprite(dp.next_minos_sprite_x_start(), dp.next_minos_sprite2_y_start());
+      next_minos_sprite3.fillSprite(bgcolor);
+      render_next_mino(3);
+      next_minos_sprite3.pushSprite(dp.next_minos_sprite_x_start(), dp.next_minos_sprite3_y_start());
+      next_minos_sprite4.fillSprite(bgcolor);
+      render_next_mino(4);
+      next_minos_sprite4.pushSprite(dp.next_minos_sprite_x_start(), dp.next_minos_sprite4_y_start());
+      next_minos_sprite5.fillSprite(bgcolor);
+      render_next_mino(5);
+      next_minos_sprite5.pushSprite(dp.next_minos_sprite_x_start(), dp.next_minos_sprite5_y_start());
 
       // hold
       hold_sprite.fillSprite(bgcolor);
       if (hold_mino.has_value()) {
         render_hold_mino();
-        hold_sprite.pushSprite(dp.hold_mino_x_in_hold_box_sprite(), dp.hold_mino_y_in_hold_box_sprite());
+        hold_sprite.pushSprite(dp.hold_mino_sprite_x_start(), dp.hold_mino_sprite_y_start());
       }
 
       // score
-      render_right_label(std::to_string(score).c_str(), dp.stats_x_right_align(), dp.score_y(), dp.score_font);
+      render_right_label(std::to_string(score), dp.score_time_x_end(), dp.score_y_start(), dp.score_font);
 
       // time
       unsigned long elapsed_ms = millis() - game_started_at;
@@ -1380,62 +1342,29 @@ class YomoTetris {
       int centis = (elapsed_ms % 1000) / 10;
       char time[9];
       snprintf(time, sizeof(time), "%02d:%02d:%02d", minutes, seconds, centis);
-      render_right_label(time, dp.stats_x_right_align(), dp.time_y(), dp.time_font);
+      render_right_label(time, dp.score_time_x_end(), dp.time_y_start(), dp.time_font);
 
       // stats
-      int stats_cnt = 0;
-      if (disp_lines) stats_cnt++;
-      if (disp_level) stats_cnt++;
-      if (disp_goal) stats_cnt++;
-      if (disp_tetris) stats_cnt++;
-      if (disp_tspins) stats_cnt++;
-      if (disp_combos) stats_cnt++;
-      if (disp_tpm) stats_cnt++;
-      if (disp_lpm) stats_cnt++;
-      stats_sprite.fillRect(0, 0, dp.stats_sprite_width(), dp.stats_sprite_height(stats_cnt), bgcolor);
+      stats_sprite.fillRect(0, 0, dp.statvals_sprite_width(), dp.statvals_sprite_height(), bgcolor);
 
       double elapsed_min = elapsed_ms / 60000.0;
+      float tpm = elapsed_ms >= 5000 ? mino_placed / elapsed_min : 0;
+      char tpm_str[6];
+      snprintf(tpm_str, sizeof(tpm_str), "%.1f", tpm);
+      float lpm = elapsed_ms >= 5000 ? removed_lines / elapsed_min : 0;
+      char lpm_str[6];
+      snprintf(lpm_str, sizeof(lpm_str), "%.1f", lpm);
 
-      int stats_idx = 0;
-      if (disp_lines) {
-        render_right_label_sprite(stats_sprite, std::to_string(removed_lines), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_level) {
-        render_right_label_sprite(stats_sprite, std::to_string(current_level()), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_goal) {
-        render_right_label_sprite(stats_sprite, std::to_string(goal), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_tetris) {
-        render_right_label_sprite(stats_sprite, std::to_string(tetris_count), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_tspins) {
-        render_right_label_sprite(stats_sprite, std::to_string(tspins), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_combos) {
-        render_right_label_sprite(stats_sprite, std::to_string(combos < 0 ? 0 : combos), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_tpm) {
-        float tpm = elapsed_ms >= 5000 ? mino_placed / elapsed_min : 0;
-        char tpm_str[6];
-        snprintf(tpm_str, sizeof(tpm_str), "%.1f", tpm);
-        render_right_label_sprite(stats_sprite, tpm_str, dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
-      if (disp_lpm) {
-        float lpm = elapsed_ms >= 5000 ? removed_lines / elapsed_min : 0;
-        char lpm_str[6];
-        snprintf(lpm_str, sizeof(lpm_str), "%.1f", lpm);
-        render_right_label_sprite(stats_sprite, lpm_str, dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
-        stats_idx++;
-      }
+      int top_stat = mode == TetrisMode::Endless ? removed_lines : goal;
 
-      stats_sprite.pushSprite(dp.stats_start_x(), dp.stats_start_y());
+      render_right_label_sprite(stats_sprite, std::to_string(top_stat),                dp.statvals_x_end_in_sprite(), dp.stats0_y_start_in_sprite(), dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(current_level()),         dp.statvals_x_end_in_sprite(), dp.stats1_y_start_in_sprite(), dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(tetris_count),            dp.statvals_x_end_in_sprite(), dp.stats2_y_start_in_sprite(), dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(tspins),                  dp.statvals_x_end_in_sprite(), dp.stats3_y_start_in_sprite(), dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(combos < 0 ? 0 : combos), dp.statvals_x_end_in_sprite(), dp.stats4_y_start_in_sprite(), dp.stats_font);
+      render_right_label_sprite(stats_sprite, tpm_str,                                 dp.statvals_x_end_in_sprite(), dp.stats5_y_start_in_sprite(), dp.stats_font);
+      render_right_label_sprite(stats_sprite, lpm_str,                                 dp.statvals_x_end_in_sprite(), dp.stats6_y_start_in_sprite(), dp.stats_font);
+
+      stats_sprite.pushSprite(dp.statvals_x_start(), dp.statvals_y_start());
     }
 };
