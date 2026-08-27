@@ -632,7 +632,7 @@ const DisplayParameters disp_param_240x240 {
   .time_label_left_margin = 5,
   .time_top_margin = 6,
 
-  // else stats; use sprite on values
+  // other stats; use sprite on values
   .stats_font = 1,
   .stats_label_chars_count = 3,
   .stats_label_left_margin = 5,
