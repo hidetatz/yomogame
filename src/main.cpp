@@ -2,6 +2,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h> 
 #include <driver/i2s.h>
+#include <esp_system.h>
 
 #include "tetris.h"
 
@@ -37,6 +38,8 @@ const int btnL = 21;
 void setup() {
   // serial setting
   Serial.begin(115200);
+
+  Serial.printf("Reset reason: %d\n", esp_reset_reason());
 
   // screen setting
   TFT_eSPI screen = TFT_eSPI();

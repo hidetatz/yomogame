@@ -1181,6 +1181,7 @@ class YomoTetris {
 
         render();
         prev_input = btns;
+        yield();
       }
     }
 
