@@ -440,6 +440,9 @@ class Board {
 };
 
 struct DisplayParameters {
+  int screen_width;
+  int screen_height;
+
   // hold
   int hold_label_font;
   int hold_label_font_height;
@@ -482,6 +485,7 @@ struct DisplayParameters {
   int stats_font_width;
   int stats_font_height;
   int stats_top_margin;
+  int stats_left_margin;
 
   // board
   int board_mino_block_size;
@@ -532,9 +536,61 @@ struct DisplayParameters {
   int hold_mino_y_in_hold_box_sprite() {
     return hold_box_y() + 1 + hold_mino_top_margin;
   }
+
+  int stats_x_right_align() { return board_box_x() - board_left_margin; }
+
+  int score_label_x() { return score_label_left_margin; }
+  int score_label_y() { return hold_box_y() + hold_box_height() + 2 + score_label_top_margin; }
+  int score_y() { return score_label_y() + score_label_font_height + score_top_margin; }
+
+  int time_label_x() { return time_label_left_margin; }
+  int time_label_y() { return score_y() + score_font_height + time_label_top_margin; }
+  int time_y() { return time_label_y() + time_label_font_height + time_top_margin; }
+
+  int stats_sprite_width() {
+    return stats_x_right_align() - stats_start_x();
+  }
+
+  int stats_sprite_height(int stats_cnt) {
+    return stats_font_height * stats_cnt + stats_top_margin * (stats_cnt-1);
+  }
+
+  int stats_chars_count() {
+    int width = stats_sprite_width();
+    // when k chars, required width is k * char_width + (k-1) * between_width (1).
+    // k * c + (k-1) <= width -> k <= (n + 1) / (c + 1)
+    // so, k = floor((n + 1) / (c + 1))
+    return width + 1 / (stats_font_width + 1);
+  }
+
+  int stats_start_x() {
+    int label_size = stats_label_chars_count * stats_label_font_width + stats_label_font_width - 1;
+    return stats_label_left_margin + label_size + stats_left_margin;
+  }
+  int stats_start_y() { return time_y() + time_font_height + stats_top_margin; }
+
+  int stats_label_x() { return stats_label_left_margin; }
+
+  int stats_x_right_align_in_sprite() { return stats_sprite_width(); }
+  int stats_y(int idx) { return stats_start_y() + stats_y_in_sprite(idx); }
+  int stats_y_in_sprite(int idx) { return (stats_top_margin + stats_font_height) * idx; }
+
+  std::string lines_label() { return stats_label_chars_count == 3 ? "LNS" : "L"; }
+  std::string level_label() { return stats_label_chars_count == 3 ? "LVL" : "V"; }
+  std::string goal_label() { return stats_label_chars_count == 3 ? "GOL" : "G"; }
+  std::string tetris_label() { return stats_label_chars_count == 3 ? "TET" : "T"; }
+  std::string tspins_label() { return stats_label_chars_count == 3 ? "TSP" : "S"; }
+  std::string combos_label() { return stats_label_chars_count == 3 ? "REN" : "R"; }
+  std::string tpm_label() { return stats_label_chars_count == 3 ? "TPM" : "P"; }
+  std::string lpm_label() { return stats_label_chars_count == 3 ? "LPM" : "C"; }
+
+  int board_box_x() { return (screen_width - (board_mino_block_size * 10 + 2)) / 2; }
+  int board_box_y() { return board_top_margin; }
 };
 
 const DisplayParameters disp_param_240x240 {
+  .screen_width = 240,
+  .screen_height = 240,
   // hold
   .hold_label_font = 2,
   .hold_label_font_height = 16,
@@ -571,12 +627,12 @@ const DisplayParameters disp_param_240x240 {
   .stats_label_chars_count = 3,
   .stats_label_font_width = 5,
   .stats_label_font_height = 7,
-  .stats_label_top_margin = 6,
   .stats_label_left_margin = 5,
   .stats_font = 1,
   .stats_font_width = 5,
   .stats_font_height = 7,
   .stats_top_margin = 6,
+  .stats_left_margin = 6,
 
   // board
   .board_mino_block_size = 11,
@@ -600,11 +656,8 @@ const DisplayParameters disp_param_240x240 {
  * Tetris main logic.
  */
 
-const int block_size = 11;
-const int bevel = 2;
-
-const int board_grid_top_left_x = 64;
-const int board_grid_top_left_y = 9;
+// const int block_size = 11;
+// const int bevel = 2;
 
 const int next_minos_block_size = 8;
 const int next_minos_grid_top_left_x = 187;
@@ -614,30 +667,6 @@ const int next_minos_right_margin = 4;
 const int next_minos_top_margin = 8;
 const int next_minos_bottom_margin = 8;
 const int next_minos_between_margin = 8;
-
-// const int hold_block_size = 8;
-// const int hold_grid_top_left_x = 11;
-// const int hold_grid_top_left_y = 27;
-// const int hold_left_margin = 4;
-// const int hold_right_margin = 4;
-// const int hold_top_margin = 4;
-// const int hold_bottom_margin = 4;
-
-const int stats_label_x     = 5;
-const int stats_right_align = 59;
-
-const int score_label_y     = 80;
-const int score_y           = 93;
-const int time_label_y      = 106;
-const int time_y            = 119;
-const int lines_y           = 132;
-const int level_y           = 145;
-const int goal_y            = 158;
-const int tetris_y          = 171;
-const int tspins_y          = 184;
-const int combos_y          = 197;
-const int tpm_y             = 210;
-const int lpm_y             = 223;
 
 const int horizontal_move_first_wait_ms = 300;
 const int horizontal_move_auto_repeating_wait_ms = 50;
@@ -680,6 +709,15 @@ class YomoTetris {
     int combos;
     boolean in_b2b;
 
+    boolean disp_lines;
+    boolean disp_level;
+    boolean disp_goal;
+    boolean disp_tetris;
+    boolean disp_tspins;
+    boolean disp_combos;
+    boolean disp_tpm;
+    boolean disp_lpm;
+
     Input input;
     uint16_t bgcolor;
     TFT_eSPI &screen;
@@ -717,6 +755,15 @@ class YomoTetris {
       tspins(0),
       combos(-1), // combos starts count when 2 consecutive clear happens, and it is counted as "1 combo", so it's good to start with -1
       in_b2b(false),
+
+      disp_lines(true),
+      disp_level(true),
+      disp_goal(true),
+      disp_tetris(true),
+      disp_tspins(true),
+      disp_combos(true),
+      disp_tpm(true),
+      disp_lpm(true),
 
       input(input),
       bgcolor(TFT_BLACK),
@@ -975,23 +1022,61 @@ class YomoTetris {
       render_square(dp.hold_box_x(), dp.hold_box_y(), dp.hold_box_width()+2, dp.hold_box_height()+2);
       render_centered_label("Hold", dp.hold_label_top_center_pos_x(), dp.hold_label_top_center_pos_y(), dp.hold_label_font);
 
-      /* stats area */
-      render_left_label("Score", stats_label_x, score_label_y, 1);
-      render_left_label("Time", stats_label_x, time_label_y, 1);
+      /* score area */
+      render_left_label("Score", dp.score_label_x(), dp.score_label_y(), dp.score_label_font);
 
-      stats_sprite.createSprite(32, 98);
-      render_left_label("LNS", stats_label_x, lines_y, 1);
-      render_left_label("LVL", stats_label_x, level_y, 1);
-      render_left_label("GOL", stats_label_x, goal_y, 1);
-      render_left_label("TET", stats_label_x, tetris_y, 1);
-      render_left_label("TSP", stats_label_x, tspins_y, 1);
-      render_left_label("CMB", stats_label_x, combos_y, 1);
-      render_left_label("TPM", stats_label_x, tpm_y, 1);
-      render_left_label("LPM", stats_label_x, lpm_y, 1);
+      /* time area */
+      render_left_label("Time", dp.time_label_x(), dp.time_label_y(), dp.time_label_font);
+
+      /* stats area */
+      int stats_cnt = 0;
+      if (disp_lines) stats_cnt++;
+      if (disp_level) stats_cnt++;
+      if (disp_goal) stats_cnt++;
+      if (disp_tetris) stats_cnt++;
+      if (disp_tspins) stats_cnt++;
+      if (disp_combos) stats_cnt++;
+      if (disp_tpm) stats_cnt++;
+      if (disp_lpm) stats_cnt++;
+      stats_sprite.createSprite(dp.stats_sprite_width(), dp.stats_sprite_height(stats_cnt));
+
+      int stats_idx = 0;
+      if (disp_lines) {
+        render_left_label(dp.lines_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_level) {
+        render_left_label(dp.level_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_goal) {
+        render_left_label(dp.goal_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_tetris) {
+        render_left_label(dp.tetris_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_tspins) {
+        render_left_label(dp.tspins_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_combos) {
+        render_left_label(dp.combos_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_tpm) {
+        render_left_label(dp.tpm_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_lpm) {
+        render_left_label(dp.lpm_label(), dp.stats_label_x(), dp.stats_y(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
 
       /* board area */
       board_sprite.createSprite(10 * dp.board_mino_block_size, 20 * dp.board_mino_block_size);
-      render_square(board_grid_top_left_x, board_grid_top_left_y, block_size * 10 + 2, block_size * 20 + 2);
+      render_square(dp.board_box_x(), dp.board_box_y(), dp.board_mino_block_size * 10 + 2, dp.board_mino_block_size * 20 + 2);
 
       /* next_minos area */
       for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(next_minos_block_size * 4, next_minos_block_size * 2);
@@ -1149,28 +1234,28 @@ class YomoTetris {
 
     /* string */
 
-    void render_centered_label(const char *string, int x, int y, uint8_t font) {
+    void render_centered_label(std::string string, int x, int y, uint8_t font) {
       screen.setTextColor(TFT_WHITE, bgcolor);
       screen.setTextDatum(TC_DATUM);
-      screen.drawString(string, x, y, font);
+      screen.drawString(string.c_str(), x, y, font);
     }
 
-    void render_left_label(const char *string, int x, int y, uint8_t font) {
+    void render_left_label(std::string string, int x, int y, uint8_t font) {
       screen.setTextColor(TFT_WHITE, bgcolor);
       screen.setTextDatum(TL_DATUM);
-      screen.drawString(string, x, y, font);
+      screen.drawString(string.c_str(), x, y, font);
     }
 
-    void render_right_label(const char *string, int x, int y, uint8_t font) {
+    void render_right_label(std::string string, int x, int y, uint8_t font) {
       screen.setTextColor(TFT_WHITE, bgcolor);
       screen.setTextDatum(TR_DATUM);
-      screen.drawString(string, x, y, font);
+      screen.drawString(string.c_str(), x, y, font);
     }
 
-    void render_right_label_sprite(TFT_eSprite& sprite, const char *string, int x, int y, uint8_t font) {
+    void render_right_label_sprite(TFT_eSprite& sprite, std::string string, int x, int y, uint8_t font) {
       sprite.setTextColor(TFT_WHITE, bgcolor);
       sprite.setTextDatum(TR_DATUM);
-      sprite.drawString(string, x, y, font);
+      sprite.drawString(string.c_str(), x, y, font);
     }
 
     /* minos and blocks */
@@ -1179,10 +1264,10 @@ class YomoTetris {
       sprite.fillRect(col * block_size, row * block_size, block_size, block_size, bgcolor);
     }
 
-    void render_block(TFT_eSprite& sprite, int row, int col, int x_offset, int y_offset, int block_size, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color) {
-      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size,           block_size,           darker_color);
-      sprite.fillRect(x_offset + col * block_size,         y_offset + row * block_size,         block_size - bevel,   block_size - bevel,   lighter_color);
-      sprite.fillRect(x_offset + col * block_size + bevel, y_offset + row * block_size + bevel, block_size - bevel*2, block_size - bevel*2, base_color);
+    void render_block(TFT_eSprite& sprite, int row, int col, int x_offset, int y_offset, int block_size, int bevel_size, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color) {
+      sprite.fillRect(x_offset + col * block_size,              y_offset + row * block_size,              block_size,                block_size,                darker_color);
+      sprite.fillRect(x_offset + col * block_size,              y_offset + row * block_size,              block_size - bevel_size,   block_size - bevel_size,   lighter_color);
+      sprite.fillRect(x_offset + col * block_size + bevel_size, y_offset + row * block_size + bevel_size, block_size - bevel_size*2, block_size - bevel_size*2, base_color);
     }
 
     void render_ghost_block(TFT_eSprite& sprite, int row, int col, int block_size, uint16_t color) {
@@ -1191,32 +1276,32 @@ class YomoTetris {
       sprite.drawRect(col * block_size + 1, row * block_size + 1, block_size - 2, block_size - 2, color);
     }
 
-    void render_mino_on_sprite_with_offset(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset, int bs) {
-      for (int i = 0; i < 4; i++) render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, bs, m.color.base, m.color.lighter, m.color.darker);
+    void render_mino_on_sprite_with_offset(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset, int block_size, int bevel_size) {
+      for (int i = 0; i < 4; i++) render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, block_size, bevel_size, m.color.base, m.color.lighter, m.color.darker);
     }
 
     void render_mino_on_board(Mino m) {
-      render_mino_on_sprite_with_offset(board_sprite, m, 0, 0, block_size);
+      render_mino_on_sprite_with_offset(board_sprite, m, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel);
     }
 
     void render_mino_on_next_minos(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset) {
-      render_mino_on_sprite_with_offset(sprite, m, x_offset, y_offset, next_minos_block_size);
+      render_mino_on_sprite_with_offset(sprite, m, x_offset, y_offset, dp.next_minos_mino_block_size, dp.next_minos_mino_bevel);
     }
 
     void render_mino_on_hold_box(Mino m, int x_offset, int y_offset) {
-      render_mino_on_sprite_with_offset(hold_sprite, m, x_offset, y_offset, dp.hold_mino_block_size);
+      render_mino_on_sprite_with_offset(hold_sprite, m, x_offset, y_offset, dp.hold_mino_block_size, dp.hold_mino_bevel);
     }
 
     void render_ghost_mino_on_board(Mino m, int hard_drop_distance) {
       uint16_t color = m.overridden_color.has_value() ? *m.overridden_color : m.color.base;
-      for (int i = 0; i < 4; i++) render_ghost_block(board_sprite, m.positions[i].row+hard_drop_distance, m.positions[i].col, block_size, color);
+      for (int i = 0; i < 4; i++) render_ghost_block(board_sprite, m.positions[i].row+hard_drop_distance, m.positions[i].col, dp.board_mino_block_size, color);
     }
 
     void render_blocks_on_board() {
       for (int row = 0; row < 20; row++) {
         for (int col = 0; col < 10; col++) {
-          if (!board.block_exists(row, col)) render_empty_block(board_sprite, row, col, block_size);
-          else render_block(board_sprite, row, col, 0, 0, block_size, board.blocks[row][col]->color.base, board.blocks[row][col]->color.lighter, board.blocks[row][col]->color.darker);
+          if (!board.block_exists(row, col)) render_empty_block(board_sprite, row, col, dp.board_mino_block_size);
+          else render_block(board_sprite, row, col, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel, board.blocks[row][col]->color.base, board.blocks[row][col]->color.lighter, board.blocks[row][col]->color.darker);
         }
       }
     }
@@ -1250,7 +1335,7 @@ class YomoTetris {
         render_mino_on_board(*board.cur_mino);
       }
 
-      board_sprite.pushSprite(board_grid_top_left_x+1, board_grid_top_left_y+1);
+      board_sprite.pushSprite(dp.board_box_x()+1, dp.board_box_y()+1);
 
       // next minos
       for (int i = 0; i < 6; i++) {
@@ -1267,47 +1352,72 @@ class YomoTetris {
         hold_sprite.pushSprite(dp.hold_mino_x_in_hold_box_sprite(), dp.hold_mino_y_in_hold_box_sprite());
       }
 
-      // stats
+      // score
+      render_right_label(std::to_string(score).c_str(), dp.stats_x_right_align(), dp.score_y(), dp.score_font);
 
-      // first fill black
-
-      // can display 9 chars
-      render_right_label(std::to_string(score).c_str(), stats_right_align, score_y, 1);
-
+      // time
       unsigned long elapsed_ms = millis() - game_started_at;
       int minutes = elapsed_ms / (1000 * 60);
       int seconds = (elapsed_ms / 1000) % 60;
       int centis = (elapsed_ms % 1000) / 10;
       char time[9];
       snprintf(time, sizeof(time), "%02d:%02d:%02d", minutes, seconds, centis);
-      render_right_label(time, stats_right_align, time_y, 1);
+      render_right_label(time, dp.stats_x_right_align(), dp.time_y(), dp.time_font);
+
+      // stats
+      int stats_cnt = 0;
+      if (disp_lines) stats_cnt++;
+      if (disp_level) stats_cnt++;
+      if (disp_goal) stats_cnt++;
+      if (disp_tetris) stats_cnt++;
+      if (disp_tspins) stats_cnt++;
+      if (disp_combos) stats_cnt++;
+      if (disp_tpm) stats_cnt++;
+      if (disp_lpm) stats_cnt++;
+      stats_sprite.fillRect(0, 0, dp.stats_sprite_width(), dp.stats_sprite_height(stats_cnt), bgcolor);
 
       double elapsed_min = elapsed_ms / 60000.0;
-      float tpm = 0;
-      float lpm = 0;
 
-      if (elapsed_ms >= 5000) {
-        tpm = mino_placed / elapsed_min;
-        lpm = removed_lines / elapsed_min;
-        if (tpm > 999.9) tpm = 999.9;
-        if (lpm > 999.9) lpm = 999.9;
+      int stats_idx = 0;
+      if (disp_lines) {
+        render_right_label_sprite(stats_sprite, std::to_string(removed_lines), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_level) {
+        render_right_label_sprite(stats_sprite, std::to_string(current_level()), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_goal) {
+        render_right_label_sprite(stats_sprite, std::to_string(goal), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_tetris) {
+        render_right_label_sprite(stats_sprite, std::to_string(tetris_count), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_tspins) {
+        render_right_label_sprite(stats_sprite, std::to_string(tspins), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_combos) {
+        render_right_label_sprite(stats_sprite, std::to_string(combos < 0 ? 0 : combos), dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_tpm) {
+        float tpm = elapsed_ms >= 5000 ? mino_placed / elapsed_min : 0;
+        char tpm_str[6];
+        snprintf(tpm_str, sizeof(tpm_str), "%.1f", tpm);
+        render_right_label_sprite(stats_sprite, tpm_str, dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
+      }
+      if (disp_lpm) {
+        float lpm = elapsed_ms >= 5000 ? removed_lines / elapsed_min : 0;
+        char lpm_str[6];
+        snprintf(lpm_str, sizeof(lpm_str), "%.1f", lpm);
+        render_right_label_sprite(stats_sprite, lpm_str, dp.stats_x_right_align_in_sprite(), dp.stats_y_in_sprite(stats_idx), dp.stats_font);
+        stats_idx++;
       }
 
-      char tpm_str[6];
-      char lpm_str[6];
-      snprintf(tpm_str, sizeof(tpm_str), "%.1f", tpm);
-      snprintf(lpm_str, sizeof(lpm_str), "%.1f", lpm);
-
-      // can display 5 chars (because of label on the same line)
-      stats_sprite.fillRect(0, 0, 32, 98, bgcolor);
-      render_right_label_sprite(stats_sprite, std::to_string(removed_lines).c_str(), 32, 0, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(current_level()).c_str(), 32, 13, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(goal).c_str(), 32, 26, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(tetris_count).c_str(), 32, 39, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(tspins).c_str(), 32, 52, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(combos < 0 ? 0 : combos).c_str(), 32, 65, 1); // because combo is -1 initially
-      render_right_label_sprite(stats_sprite, tpm_str, 32, 78, 1);
-      render_right_label_sprite(stats_sprite, lpm_str, 32, 91, 1);
-      stats_sprite.pushSprite(27, lines_y);
+      stats_sprite.pushSprite(dp.stats_start_x(), dp.stats_start_y());
     }
 };
