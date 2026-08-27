@@ -382,6 +382,13 @@ class Board {
       return true;
     }
 
+    boolean is_empty_row(int row) {
+      for (int col = 0; col < 10; col++) {
+        if (block_exists(row, col)) return false;
+      }
+      return true;
+    }
+
     std::tuple<int, std::array<int, 4>> deletable_rows() {
       int count = 0;
       std::array<int, 4> rows = {};
@@ -422,6 +429,13 @@ class Board {
           delete_block(row, col);
         }
       }
+    }
+
+    boolean is_perfect() {
+      for (int row = 0; row < 20; row++) {
+        if (!is_empty_row(row)) return false;
+      }
+      return true;
     }
 };
 
@@ -475,6 +489,10 @@ const int horizontal_move_auto_repeating_wait_ms = 50;
 const int lockdown_wait_ms = 500;
 const int lockdown_reset_move_limit = 15;
 
+enum class TSpinKind {
+  TSPIN, TSPIN_MINI, NONE
+};
+
 class YomoTetris_240x240 {
   public:
     std::array<MinoType, 7> cur_bag;
@@ -503,6 +521,7 @@ class YomoTetris_240x240 {
     int tetris_count;
     int tspins;
     int combos;
+    boolean in_b2b;
 
     Input input;
     uint16_t bgcolor;
@@ -537,7 +556,8 @@ class YomoTetris_240x240 {
       goal(0),
       tetris_count(0),
       tspins(0),
-      combos(0),
+      combos(-1), // combos starts count when 2 consecutive clear happens, and it is counted as "1 combo", so it's good to start with -1
+      in_b2b(false),
 
       input(input),
       bgcolor(TFT_BLACK),
@@ -623,9 +643,9 @@ class YomoTetris_240x240 {
       }
     }
 
-    void check_tspin() {
-      if (!board.cur_mino->is_T()) return;
-      if (!was_last_move_rotation) return;
+    TSpinKind check_tspin() {
+      if (!board.cur_mino->is_T()) return TSpinKind::NONE;
+      if (!was_last_move_rotation) return TSpinKind::NONE;
       // A and B are front side corner
       int A_row = 0;
       int A_col = 0;
@@ -686,21 +706,20 @@ class YomoTetris_240x240 {
       if (C_filled) filled_count++;
       if (D_filled) filled_count++;
 
-      if (filled_count < 3) return;
+      if (filled_count < 3) return TSpinKind::NONE;
 
       if ((A_filled && B_filled) || last_kick_index == 4) {
-        tspins++;
-        // T-Spin
-      } else {
-        tspins++;
-        // T-Spin mini
+        return TSpinKind::TSPIN;
       }
+
+      return TSpinKind::TSPIN_MINI;
     }
 
     void lock_mino_and_clear_lines() {
       // T-spin check
-      check_tspin();
-      last_kick_index = 0;
+      TSpinKind tspin = check_tspin();
+      if (tspin == TSpinKind::TSPIN || tspin == TSpinKind::TSPIN_MINI) tspins++;
+      last_kick_index = 0; // reset last_kick_index for the next check
 
       board.lockdown_mino();
       mino_placed++;
@@ -708,9 +727,32 @@ class YomoTetris_240x240 {
 
       // delete rows with animation
       auto [count, rows] = board.deletable_rows();
+
+      int base_score = 0;
+      if (tspin == TSpinKind::TSPIN) {
+        if (count == 0) base_score = 400;
+        else if (count == 1) base_score = 800;
+        else if (count == 2) base_score = 1200;
+        else if (count == 3) base_score = 1600;
+      } else if (tspin == TSpinKind::TSPIN_MINI) {
+        if (count == 0) base_score = 100;
+        else if (count == 1) base_score = 200;
+        else if (count == 2) base_score = 400;
+      } else { // no tspin
+        if (count == 1) base_score = 100;
+        else if (count == 2) base_score = 300;
+        else if (count == 3) base_score = 500;
+        else if (count == 4) base_score = 800;
+      }
+
+      int cur_level = current_level();
+
       if (count == 0) {
         // if mino locked but no lines cleared, cancel combo
-        combos = 0;
+        combos = -1;
+
+        // when no lines cleared, B2B, REN, Perfect check are not needed
+        score += cur_level * base_score;
         return;
       }
 
@@ -733,11 +775,39 @@ class YomoTetris_240x240 {
         render();
         delay(30);
       }
-      removed_lines += count;
-      if (count == 4) tetris_count++;
+      board.clear_lines(rows, count);
+
+      // if some lines cleared, record combos
       combos++;
 
-      board.clear_lines(rows, count);
+      boolean b2b_eligible = (count == 4 || (tspin == TSpinKind::TSPIN_MINI || tspin == TSpinKind::TSPIN));
+      boolean b2b_bonus = in_b2b && b2b_eligible;
+      if (b2b_bonus) {
+        base_score = base_score * 3 / 2;
+      }
+
+      int combo_score = 50 * combos * cur_level; // at this line, combos are never -1 so this is ok
+
+      int perfect_bonus = 0;
+      if (board.is_perfect()) {
+        if (count == 1) perfect_bonus = 800;
+        else if (count == 2) perfect_bonus = 1200;
+        else if (count == 3) perfect_bonus = 1800;
+        else if (count == 4 && b2b_bonus) perfect_bonus = 3200;
+        else if (count == 4) perfect_bonus = 2000;
+      }
+
+      score += base_score * cur_level;
+      score += combo_score;
+      score += perfect_bonus * cur_level;
+
+      removed_lines += count;
+      if (count == 4) tetris_count++;
+      in_b2b = b2b_eligible;
+    }
+
+    int current_level() {
+      return starting_level + (removed_lines / 10);
     }
 
     void start() {
@@ -801,6 +871,7 @@ class YomoTetris_240x240 {
             i++;
             if(i % 3 == 0) render();
           }
+          score += 2 * i;
           render();
           lock_mino_and_clear_lines();
           pop_new_mino_if_needed(now);
@@ -853,7 +924,7 @@ class YomoTetris_240x240 {
 
           // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
           if (!prev_input.DOWN || soft_drop_interval_passed) {
-            try_move(MoveDirection::DOWN, 1, now);
+            if (try_move(MoveDirection::DOWN, 1, now)) score += 1;
             last_soft_dropped = now;
           }
         }
@@ -1071,11 +1142,11 @@ class YomoTetris_240x240 {
       // can display 5 chars (because of label on the same line)
       stats_sprite.fillRect(0, 0, 32, 98, bgcolor);
       render_right_label_sprite(stats_sprite, std::to_string(removed_lines).c_str(), 32, 0, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(starting_level + (removed_lines / 10)).c_str(), 32, 13, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(current_level()).c_str(), 32, 13, 1);
       render_right_label_sprite(stats_sprite, std::to_string(goal).c_str(), 32, 26, 1);
       render_right_label_sprite(stats_sprite, std::to_string(tetris_count).c_str(), 32, 39, 1);
       render_right_label_sprite(stats_sprite, std::to_string(tspins).c_str(), 32, 52, 1);
-      render_right_label_sprite(stats_sprite, std::to_string(combos).c_str(), 32, 65, 1);
+      render_right_label_sprite(stats_sprite, std::to_string(combos < 0 ? 0 : combos).c_str(), 32, 65, 1); // because combo is -1 initially
       render_right_label_sprite(stats_sprite, tpm_str, 32, 78, 1);
       render_right_label_sprite(stats_sprite, lpm_str, 32, 91, 1);
       stats_sprite.pushSprite(27, lines_y);
