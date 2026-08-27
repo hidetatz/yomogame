@@ -495,7 +495,7 @@ struct DisplayParameters {
 
   // next minos
   int next_minos_label_font;
-  int next_minos_label_height;
+  int next_minos_label_font_height;
   int next_minos_label_top_margin;
   int next_minos_box_top_margin;
   int next_minos_box_left_margin;
@@ -586,11 +586,45 @@ struct DisplayParameters {
 
   int board_box_x() { return (screen_width - (board_mino_block_size * 10 + 2)) / 2; }
   int board_box_y() { return board_top_margin; }
+
+  int board_box_x_right() { return board_box_x() + board_mino_block_size * 10 + 1; }
+
+  int next_minos_box_x() {
+    return board_box_x_right() + next_minos_box_left_margin;
+  }
+
+  int next_minos_box_y() {
+    return next_minos_label_top_margin + next_minos_label_font_height + next_minos_box_top_margin;
+  }
+
+  int next_minos_box_width() {
+    return next_minos_mino_left_margin * 2 + next_minos_mino_block_size * 4;
+  }
+  int next_minos_box_height() {
+    return next_minos_mino_top_margin * 7 + next_minos_mino_block_size * 2 * 6;
+  }
+
+  int next_minos_label_top_center_pos_x() {
+    return next_minos_box_x() + ((next_minos_box_width() + 2) / 2);
+  }
+
+  int next_minos_label_top_center_pos_y() {
+    return next_minos_label_top_margin;
+  }
+
+  int next_minos_x_in_next_minos_box_sprite() {
+    return next_minos_box_x() + 1 + next_minos_mino_left_margin;
+  }
+
+  int next_minos_y_in_next_minos_box_sprite(int idx) {
+    return next_minos_box_y() + 1 + next_minos_mino_top_margin + (next_minos_mino_top_margin+next_minos_mino_block_size*2) * idx;
+  }
 };
 
 const DisplayParameters disp_param_240x240 {
   .screen_width = 240,
   .screen_height = 240,
+
   // hold
   .hold_label_font = 2,
   .hold_label_font_height = 16,
@@ -642,7 +676,7 @@ const DisplayParameters disp_param_240x240 {
 
   // next minos
   .next_minos_label_font = 2,
-  .next_minos_label_height = 16,
+  .next_minos_label_font_height = 16,
   .next_minos_label_top_margin = 9,
   .next_minos_box_top_margin = 2,
   .next_minos_box_left_margin = 12,
@@ -655,18 +689,6 @@ const DisplayParameters disp_param_240x240 {
 /*
  * Tetris main logic.
  */
-
-// const int block_size = 11;
-// const int bevel = 2;
-
-const int next_minos_block_size = 8;
-const int next_minos_grid_top_left_x = 187;
-const int next_minos_grid_top_left_y = 27;
-const int next_minos_left_margin = 4;
-const int next_minos_right_margin = 4;
-const int next_minos_top_margin = 8;
-const int next_minos_bottom_margin = 8;
-const int next_minos_between_margin = 8;
 
 const int horizontal_move_first_wait_ms = 300;
 const int horizontal_move_auto_repeating_wait_ms = 50;
@@ -1079,12 +1101,9 @@ class YomoTetris {
       render_square(dp.board_box_x(), dp.board_box_y(), dp.board_mino_block_size * 10 + 2, dp.board_mino_block_size * 20 + 2);
 
       /* next_minos area */
-      for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(next_minos_block_size * 4, next_minos_block_size * 2);
-      const int next_minos_grid_width = next_minos_left_margin + next_minos_block_size * 4 + next_minos_right_margin + 2;
-      const int next_minos_grid_height = next_minos_top_margin + next_minos_block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 2;
-      render_square(next_minos_grid_top_left_x, next_minos_grid_top_left_y, next_minos_grid_width, next_minos_grid_height);
-      render_centered_label("Next", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
-
+      for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(dp.next_minos_mino_block_size * 4, dp.next_minos_mino_block_size * 2);
+      render_square(dp.next_minos_box_x(), dp.next_minos_box_y(), dp.next_minos_box_width()+2, dp.next_minos_box_height()+2);
+      render_centered_label("Next", dp.next_minos_label_top_center_pos_x(), dp.next_minos_label_top_center_pos_y(), dp.next_minos_label_font);
 
       /* yomogi area */
       screen.setSwapBytes(true);
@@ -1308,8 +1327,8 @@ class YomoTetris {
 
     void render_next_mino(int num) {
         Mino m = Mino::for_next_minos(next_mino_type(num));
-        int x_offset = m.is_I() ? 0 : m.is_O() ? next_minos_block_size : next_minos_block_size / 2;
-        int y_offset = m.is_I() ? (next_minos_block_size / 2) : next_minos_block_size;
+        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.next_minos_mino_block_size : dp.next_minos_mino_block_size / 2;
+        int y_offset = m.is_I() ? (dp.next_minos_mino_block_size / 2) : dp.next_minos_mino_block_size;
         render_mino_on_next_minos(next_minos_sprites[num], m, x_offset, y_offset);
     }
 
@@ -1341,14 +1360,13 @@ class YomoTetris {
       for (int i = 0; i < 6; i++) {
         next_minos_sprites[i].fillSprite(bgcolor);
         render_next_mino(i);
-        next_minos_sprites[i].pushSprite(1 + next_minos_grid_top_left_x + next_minos_left_margin, 1 + next_minos_grid_top_left_y + next_minos_top_margin + (next_minos_block_size * 2 + next_minos_between_margin) * i);
+        next_minos_sprites[i].pushSprite(dp.next_minos_x_in_next_minos_box_sprite(), dp.next_minos_y_in_next_minos_box_sprite(i));
       }
 
       // hold
       hold_sprite.fillSprite(bgcolor);
       if (hold_mino.has_value()) {
         render_hold_mino();
-        // hold_sprite.pushSprite(1 + hold_grid_top_left_x + hold_left_margin, 1 + hold_grid_top_left_y + hold_top_margin);
         hold_sprite.pushSprite(dp.hold_mino_x_in_hold_box_sprite(), dp.hold_mino_y_in_hold_box_sprite());
       }
 
