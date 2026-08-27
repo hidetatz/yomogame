@@ -526,8 +526,8 @@ struct DisplayParameters {
   int stats_label_x_end() { return stats_label_x_start() + (stats_label_chars_count * stats_font_width + stats_label_chars_count - 1); }
 
   int statvals_sprite_width() { return score_time_x_end() - statvals_x_start(); }
-  int statvals_sprite_height() { return stats_font_height * 7 + stats_top_margin * 6; } // in all modes there are 7 stats shown
-  int statvals_chars_count() { return statvals_sprite_width() + 1 / (stats_font_width + 1); }
+  int statvals_sprite_height() { return stats6_y_end() - stats0_y_start(); } // in all modes there are 7 stats shown
+  int statvals_chars_count() { return (statvals_sprite_width() + 1) / (stats_font_width + 1); }
   int statvals_x_start() { return stats_label_x_end() + stats_left_margin; }
   int statvals_y_start() { return time_y_end() + stats_top_margin; }
   int statvals_x_end_in_sprite() { return statvals_sprite_width(); }
@@ -572,7 +572,7 @@ struct DisplayParameters {
   int board_box_width() { return 2 + board_sprite_width(); }
   int board_box_height() { return 2 + board_sprite_height(); }
   int board_box_x_start() { return (screen_width - board_box_width()) / 2; }
-  int board_box_x_end() { return board_box_x_start() + board_box_width() - 1; }
+  int board_box_x_end() { return board_box_x_start() + board_box_width(); }
   int board_box_y_start() { return board_top_margin; }
   int board_box_y_end() { return board_box_y_start() + board_box_height(); }
   int board_sprite_width() { return board_mino_block_size * 10; }
@@ -588,8 +588,8 @@ struct DisplayParameters {
   int next_minos_label_top_center_pos_y() { return next_minos_label_top_margin; }
   int next_minos_sprite_width() { return next_minos_mino_block_size * 4; }
   int next_minos_sprite_height() { return next_minos_mino_block_size * 2; }
-  int next_minos_sprite_x_start() { return next_minos_box_x_start() + next_minos_mino_left_margin; }
-  int next_minos_sprite0_y_start() { return next_minos_box_y_start() + next_minos_mino_top_margin; }
+  int next_minos_sprite_x_start() { return next_minos_box_x_start() + 1 + next_minos_mino_left_margin; }
+  int next_minos_sprite0_y_start() { return next_minos_box_y_start() + 1 + next_minos_mino_top_margin; }
   int next_minos_sprite0_y_end() { return next_minos_sprite0_y_start() + next_minos_sprite_height(); }
   int next_minos_sprite1_y_start() { return next_minos_sprite0_y_end() + next_minos_mino_top_margin; }
   int next_minos_sprite1_y_end() { return next_minos_sprite1_y_start() + next_minos_sprite_height(); }
