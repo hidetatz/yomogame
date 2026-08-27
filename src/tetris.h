@@ -439,10 +439,165 @@ class Board {
     }
 };
 
+struct DisplayParameters {
+  // hold
+  int hold_label_font;
+  int hold_label_font_height;
+  int hold_label_top_margin;
+  int hold_box_top_margin;
+  int hold_box_left_margin;
+  int hold_mino_block_size;
+  int hold_mino_bevel;
+  int hold_mino_top_margin;
+  int hold_mino_left_margin;
+
+  // score
+  int score_label_font;
+  int score_label_font_height;
+  int score_label_top_margin;
+  int score_label_left_margin;
+  int score_font;
+  int score_font_width;
+  int score_font_height;
+  int score_top_margin;
+
+  // time
+  int time_label_font;
+  int time_label_font_height;
+  int time_label_top_margin;
+  int time_label_left_margin;
+  int time_font;
+  int time_font_width;
+  int time_font_height;
+  int time_top_margin;
+
+  // else stats; use sprite on values
+  int stats_label_font;
+  int stats_label_chars_count;
+  int stats_label_font_width;
+  int stats_label_font_height;
+  int stats_label_top_margin;
+  int stats_label_left_margin;
+  int stats_font;
+  int stats_font_width;
+  int stats_font_height;
+  int stats_top_margin;
+
+  // board
+  int board_mino_block_size;
+  int board_mino_bevel;
+  int board_top_margin;
+  int board_left_margin;
+
+  // next minos
+  int next_minos_label_font;
+  int next_minos_label_height;
+  int next_minos_label_top_margin;
+  int next_minos_box_top_margin;
+  int next_minos_box_left_margin;
+  int next_minos_mino_block_size;
+  int next_minos_mino_bevel;
+  int next_minos_mino_top_margin;
+  int next_minos_mino_left_margin;
+
+  int hold_label_top_center_pos_x() {
+    return hold_box_left_margin + ((hold_box_width() + 2) / 2);
+  }
+
+  int hold_label_top_center_pos_y() {
+    return hold_label_top_margin;
+  }
+
+  int hold_box_x() {
+    return hold_box_left_margin;
+  }
+
+  int hold_box_y() {
+    return hold_label_top_margin + hold_label_font_height + hold_box_top_margin;
+  }
+
+  // do not include line pixel
+  int hold_box_width() {
+    return hold_mino_left_margin * 2 + hold_mino_block_size * 4;
+  }
+
+  int hold_box_height() {
+    return hold_mino_top_margin * 2 + hold_mino_block_size * 4;
+  }
+
+  int hold_mino_x_in_hold_box_sprite() {
+    return hold_box_left_margin + 1 + hold_mino_left_margin;
+  }
+
+  int hold_mino_y_in_hold_box_sprite() {
+    return hold_box_y() + 1 + hold_mino_top_margin;
+  }
+};
+
+const DisplayParameters disp_param_240x240 {
+  // hold
+  .hold_label_font = 2,
+  .hold_label_font_height = 16,
+  .hold_label_top_margin = 9,
+  .hold_box_top_margin = 2,
+  .hold_box_left_margin = 11,
+  .hold_mino_block_size = 8,
+  .hold_mino_bevel = 1,
+  .hold_mino_top_margin = 4,
+  .hold_mino_left_margin = 4,
+
+  // score
+  .score_label_font = 1,
+  .score_label_font_height = 7,
+  .score_label_top_margin = 11,
+  .score_label_left_margin = 5,
+  .score_font = 1,
+  .score_font_width = 5,
+  .score_font_height = 7,
+  .score_top_margin = 6,
+
+  // time
+  .time_label_font = 1,
+  .time_label_font_height = 7,
+  .time_label_top_margin = 6,
+  .time_label_left_margin = 5,
+  .time_font = 1,
+  .time_font_width = 5,
+  .time_font_height = 7,
+  .time_top_margin = 6,
+
+  // else stats; use sprite on values
+  .stats_label_font = 1,
+  .stats_label_chars_count = 3,
+  .stats_label_font_width = 5,
+  .stats_label_font_height = 7,
+  .stats_label_top_margin = 6,
+  .stats_label_left_margin = 5,
+  .stats_font = 1,
+  .stats_font_width = 5,
+  .stats_font_height = 7,
+  .stats_top_margin = 6,
+
+  // board
+  .board_mino_block_size = 11,
+  .board_mino_bevel = 2,
+  .board_top_margin = 9,
+  .board_left_margin = 5,
+
+  // next minos
+  .next_minos_label_font = 2,
+  .next_minos_label_height = 16,
+  .next_minos_label_top_margin = 9,
+  .next_minos_box_top_margin = 2,
+  .next_minos_box_left_margin = 12,
+  .next_minos_mino_block_size = 8,
+  .next_minos_mino_bevel = 1,
+  .next_minos_mino_top_margin = 8,
+  .next_minos_mino_left_margin = 4,
+};
+
 /*
  * Tetris main logic.
- *
- * This currently depends on 240x240 TFT screen.
  */
 
 const int block_size = 11;
@@ -460,13 +615,13 @@ const int next_minos_top_margin = 8;
 const int next_minos_bottom_margin = 8;
 const int next_minos_between_margin = 8;
 
-const int hold_block_size = 8;
-const int hold_grid_top_left_x = 11;
-const int hold_grid_top_left_y = 27;
-const int hold_left_margin = 4;
-const int hold_right_margin = 4;
-const int hold_top_margin = 4;
-const int hold_bottom_margin = 4;
+// const int hold_block_size = 8;
+// const int hold_grid_top_left_x = 11;
+// const int hold_grid_top_left_y = 27;
+// const int hold_left_margin = 4;
+// const int hold_right_margin = 4;
+// const int hold_top_margin = 4;
+// const int hold_bottom_margin = 4;
 
 const int stats_label_x     = 5;
 const int stats_right_align = 59;
@@ -493,8 +648,10 @@ enum class TSpinKind {
   TSPIN, TSPIN_MINI, NONE
 };
 
-class YomoTetris_240x240 {
+class YomoTetris {
   public:
+    DisplayParameters dp;
+
     std::array<MinoType, 7> cur_bag;
     std::array<MinoType, 7> next_bag;
     int mino_idx;
@@ -532,7 +689,9 @@ class YomoTetris_240x240 {
     TFT_eSprite stats_sprite;
 
   public:
-    YomoTetris_240x240(Input input, TFT_eSPI &screen) :
+    YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
+      dp(params),
+
       cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       mino_idx(0),
@@ -811,23 +970,10 @@ class YomoTetris_240x240 {
     }
 
     void start() {
-      /* board area */
-      board_sprite.createSprite(10 * block_size, 20 * block_size);
-      render_square(board_grid_top_left_x, board_grid_top_left_y, block_size * 10 + 2, block_size * 20 + 2);
-
-      /* next_minos area */
-      for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(next_minos_block_size * 4, next_minos_block_size * 2);
-      const int next_minos_grid_width = next_minos_left_margin + next_minos_block_size * 4 + next_minos_right_margin + 2;
-      const int next_minos_grid_height = next_minos_top_margin + next_minos_block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 2;
-      render_square(next_minos_grid_top_left_x, next_minos_grid_top_left_y, next_minos_grid_width, next_minos_grid_height);
-      render_centered_label("Next", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
-
       /* hold area */
-      hold_sprite.createSprite(4 * hold_block_size, 4 * hold_block_size);
-      const int hold_grid_width = hold_left_margin + hold_block_size * 4 + hold_right_margin + 2;
-      const int hold_grid_height = hold_top_margin + hold_block_size * 4 + hold_bottom_margin + 2;
-      render_square(hold_grid_top_left_x, hold_grid_top_left_y, hold_grid_width, hold_grid_height);
-      render_centered_label("Hold", hold_grid_top_left_x + hold_grid_width / 2, hold_grid_top_left_y - 18, 2);
+      hold_sprite.createSprite(4 * dp.hold_mino_block_size, 4 * dp.hold_mino_block_size);
+      render_square(dp.hold_box_x(), dp.hold_box_y(), dp.hold_box_width()+2, dp.hold_box_height()+2);
+      render_centered_label("Hold", dp.hold_label_top_center_pos_x(), dp.hold_label_top_center_pos_y(), dp.hold_label_font);
 
       /* stats area */
       render_left_label("Score", stats_label_x, score_label_y, 1);
@@ -842,6 +988,18 @@ class YomoTetris_240x240 {
       render_left_label("CMB", stats_label_x, combos_y, 1);
       render_left_label("TPM", stats_label_x, tpm_y, 1);
       render_left_label("LPM", stats_label_x, lpm_y, 1);
+
+      /* board area */
+      board_sprite.createSprite(10 * dp.board_mino_block_size, 20 * dp.board_mino_block_size);
+      render_square(board_grid_top_left_x, board_grid_top_left_y, block_size * 10 + 2, block_size * 20 + 2);
+
+      /* next_minos area */
+      for (int i = 0; i < 6; i++) next_minos_sprites[i].createSprite(next_minos_block_size * 4, next_minos_block_size * 2);
+      const int next_minos_grid_width = next_minos_left_margin + next_minos_block_size * 4 + next_minos_right_margin + 2;
+      const int next_minos_grid_height = next_minos_top_margin + next_minos_block_size * 2 * 6 + next_minos_between_margin * 5 + next_minos_bottom_margin + 2;
+      render_square(next_minos_grid_top_left_x, next_minos_grid_top_left_y, next_minos_grid_width, next_minos_grid_height);
+      render_centered_label("Next", next_minos_grid_top_left_x + next_minos_grid_width / 2, next_minos_grid_top_left_y - 18, 2);
+
 
       /* yomogi area */
       screen.setSwapBytes(true);
@@ -1046,7 +1204,7 @@ class YomoTetris_240x240 {
     }
 
     void render_mino_on_hold_box(Mino m, int x_offset, int y_offset) {
-      render_mino_on_sprite_with_offset(hold_sprite, m, x_offset, y_offset, hold_block_size);
+      render_mino_on_sprite_with_offset(hold_sprite, m, x_offset, y_offset, dp.hold_mino_block_size);
     }
 
     void render_ghost_mino_on_board(Mino m, int hard_drop_distance) {
@@ -1075,8 +1233,8 @@ class YomoTetris_240x240 {
         // in case hold mino color is overridden. This is needed because this does not directly renders hold_mino but
         // it creates a new Mino instance m. This is not a good design
         m.color = hold_mino->color;
-        int x_offset = m.is_I() ? 0 : m.is_O() ? hold_block_size : hold_block_size / 2;
-        int y_offset = m.is_I() ? hold_block_size+(hold_block_size / 2) : hold_block_size*2;
+        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
+        int y_offset = m.is_I() ? dp.hold_mino_block_size+(dp.hold_mino_block_size / 2) : dp.hold_mino_block_size*2;
         render_mino_on_hold_box(m, x_offset, y_offset);
     }
 
@@ -1105,7 +1263,8 @@ class YomoTetris_240x240 {
       hold_sprite.fillSprite(bgcolor);
       if (hold_mino.has_value()) {
         render_hold_mino();
-        hold_sprite.pushSprite(1 + hold_grid_top_left_x + hold_left_margin, 1 + hold_grid_top_left_y + hold_top_margin);
+        // hold_sprite.pushSprite(1 + hold_grid_top_left_x + hold_left_margin, 1 + hold_grid_top_left_y + hold_top_margin);
+        hold_sprite.pushSprite(dp.hold_mino_x_in_hold_box_sprite(), dp.hold_mino_y_in_hold_box_sprite());
       }
 
       // stats
