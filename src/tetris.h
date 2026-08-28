@@ -13,7 +13,7 @@
 #include <yomogi.h>
 
 /*
- * Mino and Board
+ * Mino, Board and Game
  * This does not depend on screen size.
  */
 
@@ -697,7 +697,7 @@ enum class TetrisMode {
   Endless, L40, L150, L999
 };
 
-class YomoTetris {
+class Game {
   public:
     DisplayParameters dp;
 
@@ -740,10 +740,10 @@ class YomoTetris {
     TFT_eSprite stats_sprite;
 
   public:
-    YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
+    (Input input, TFT_eSPI &screen, DisplayParameters params, GameMode mode) :
       dp(params),
 
-      mode(TetrisMode::Endless),
+      mode(mode),
 
       cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
@@ -1352,5 +1352,57 @@ class YomoTetris {
       next_minos_sprite.fillSprite(bgcolor);
       render_next_minos();
       next_minos_sprite.pushSprite(dp.next_minos_sprite_x, dp.next_minos_sprite_y);
+    }
+};
+
+class YomoTetris {
+  public:
+    DisplayParameters dp;
+    Input input;
+    uint16_t bgcolor;
+    TFT_eSPI &screen;
+
+    YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
+      dp(params),
+      input(input),
+      bgcolor(TFT_BLACK),
+      screen(screen) {}
+
+    void display_textbox(std::string str, int x, int y, int width, int height, uint8_t font, boolean selected) {
+      if (selected) {
+        screen.fillRect(dp.menu_mode_x, dp.menu_mode_endless_y, dp.menu_mode_width, dp.menu_mode_height, TFT_WHITE);
+        sprite.setTextColor(TFT_BLACK, TFT_WHITE);
+        sprite.setTextDatum(MC_DATUM);
+        sprite.drawString(str.c_str(), x + (width / 2), y + (height / 2), font);
+      }
+    }
+
+    void menu() {
+      TetrisMode cur_select = TetrisMode::Endless;
+      display_menu("Endless",   dp.menu_mode_x, dp.menu_mode_endless_y, dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::Endless);
+      display_menu("40 Lines",  dp.menu_mode_x, dp.menu_mode_l40_y,     dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::L40);
+      display_menu("150 Lines", dp.menu_mode_x, dp.menu_mode_l150_y,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::L150);
+      display_menu("999 Lines", dp.menu_mode_x, dp.menu_mode_l999_y,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::L999);
+
+      boolean was_A = false;
+      boolean was_up = false;
+      boolean was_down = false;
+      boolean was_left = false;
+      boolean was_right = false;
+      while (true) {
+        if ((input.A && !was_A) || (input.UP && !was_up) || (input.DOWN && !was_down) || (input.LEFT && !was_left) || (input.RIGHT && !was_right)) {
+          if (input.A)
+        }
+        yield();
+      }
+    }
+
+    void start() {
+      while (true) {
+        TetrisMode mode = menu();
+        Game game = Game(input, screen, dp, mode);
+        GameResult result = game.start()
+        show_result(result);
+      }
     }
 };
