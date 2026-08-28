@@ -360,9 +360,19 @@ class Board {
       return !can_move_mino(MoveDirection::DOWN, 1);
     }
 
-    void lockdown_mino() {
-      for (int i = 0; i < 4; i++) blocks[cur_mino->positions[i].row][cur_mino->positions[i].col] = Block(cur_mino->color);
+    boolean lockdown_mino() {
+      boolean locked_out = false;
+      for (int i = 0; i < 4; i++) {
+        int row = cur_mino->positions[i].row;
+        int col = cur_mino->positions[i].col;
+        if (row < 0) {
+          locked_out = true;
+          continue;
+        }
+        blocks[row][col] = Block(cur_mino->color);
+      }
       cur_mino = std::nullopt;
+      return !locked_out;
     }
 
     // how many down happens on hard drop?
@@ -839,10 +849,7 @@ class YomoTetris {
     void pop_new_mino_if_needed(unsigned long now) {
       if (board.cur_mino_exists()) return;
       Mino m = next_mino();
-      if (!try_place_mino(m, now)) {
-        Serial.println("Game over!");
-        while (true) delay(1000);
-      }
+      if (!try_place_mino(m, now)) gameover();
     }
 
     TSpinKind check_tspin() {
@@ -923,7 +930,7 @@ class YomoTetris {
       if (tspin == TSpinKind::TSPIN || tspin == TSpinKind::TSPIN_MINI) tspins++;
       last_kick_index = 0; // reset last_kick_index for the next check
 
-      board.lockdown_mino();
+      if (!board.lockdown_mino()) gameover();
       mino_placed++;
       if (hold_once_tried) hold_once_tried = false;
 
@@ -1010,6 +1017,11 @@ class YomoTetris {
 
     int current_level() {
       return starting_level + (removed_lines / 10);
+    }
+
+    void gameover() {
+      Serial.printf("Game over!\n");
+      while (true) delay(1000);
     }
 
     void start() {
@@ -1107,10 +1119,7 @@ class YomoTetris {
             // next mino is holded one if hold exists, else next_mino();
             Mino next = temp.has_value() ? *temp : next_mino();
 
-            if (!try_place_mino(next, now)) {
-              Serial.println("Game over!");
-              while (true) delay(1000);
-            }
+            if (!try_place_mino(next, now)) gameover();
           }
         }
 
