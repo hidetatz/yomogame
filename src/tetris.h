@@ -450,6 +450,38 @@ class Board {
 };
 
 struct DisplayParameters {
+  // menu and result
+  const int menu_sprite_x;
+  const int menu_sprite_y;
+  const int menu_sprite_width;
+  const int menu_sprite_height;
+  const int menu_mode_width;
+  const int menu_mode_height;
+  const int menu_mode_x_in_sprite;
+  const int menu_mode_endless_y_in_sprite;
+  const int menu_mode_l40_y_in_sprite;
+  const int menu_mode_l150_y_in_sprite;
+  const int menu_mode_l999_y_in_sprite;
+
+  const int result_sprite_x;
+  const int result_sprite_y;
+  const int result_sprite_width;
+  const int result_sprite_height;
+  const int result_label_x_in_sprite;
+  const int result_value_x_right_in_sprite;
+  const int result_result_y_in_sprite;
+  const int result_score_y_in_sprite;
+  const int result_time_y_in_sprite;
+  const int result_lines_y_in_sprite;
+  const int result_level_y_in_sprite;
+  const int result_tetris_y_in_sprite;
+  const int result_tspins_y_in_sprite;
+  const int result_maxcombos_y_in_sprite;
+  const int result_holds_y_in_sprite;
+  const int result_tpm_y_in_sprite;
+  const int result_lpm_y_in_sprite;
+  const int result_msg_y_in_sprite;
+
   // hold label
   const int hold_label_font;
   const int hold_label_x_center;
@@ -566,6 +598,38 @@ struct DisplayParameters {
 };
 
 const DisplayParameters disp_param_240x240 {
+  // menu
+  .menu_sprite_x = 0,
+  .menu_sprite_y = 0,
+  .menu_sprite_width = 240,
+  .menu_sprite_height = 240,
+  .menu_mode_width = 180,
+  .menu_mode_height = 20,
+  .menu_mode_x_in_sprite = 30,
+  .menu_mode_endless_y_in_sprite = 20,
+  .menu_mode_l40_y_in_sprite = 60,
+  .menu_mode_l150_y_in_sprite = 100,
+  .menu_mode_l999_y_in_sprite = 140,
+
+  .result_sprite_x = 45,
+  .result_sprite_y = 35,
+  .result_sprite_width = 150,
+  .result_sprite_height = 169,
+  .result_label_x_in_sprite = 15,
+  .result_value_x_right_in_sprite = 135,
+  .result_result_y_in_sprite = 10,
+  .result_score_y_in_sprite = 23,
+  .result_time_y_in_sprite = 35,
+  .result_lines_y_in_sprite = 48,
+  .result_level_y_in_sprite = 61,
+  .result_tetris_y_in_sprite = 74,
+  .result_tspins_y_in_sprite = 87,
+  .result_maxcombos_y_in_sprite = 100,
+  .result_holds_y_in_sprite = 113,
+  .result_tpm_y_in_sprite = 126,
+  .result_lpm_y_in_sprite = 139,
+  .result_msg_y_in_sprite = 152,
+
   // hold label
   .hold_label_font = 2,
   .hold_label_x_center = 32,
@@ -693,15 +757,51 @@ enum class TSpinKind {
   TSPIN, TSPIN_MINI, NONE
 };
 
-enum class TetrisMode {
+enum class GameMode {
   Endless, L40, L150, L999
+};
+
+enum class GameResultCode {
+  Cancel, Clear, Fail
+};
+
+class GameResult {
+  public:
+    GameResultCode code;
+    GameMode mode;
+    int mino_placed;
+    unsigned long elapsed_ms;
+    int score;
+    int removed_lines;
+    int level_at_last;
+    int tetris_count;
+    int tspins;
+    int max_combos;
+    int holds;
+    double tpm;
+    double lpm;
+
+  GameResult(GameResultCode code, GameMode mode, int mino_placed, unsigned long elapsed_ms, int score, int removed_lines, int level_at_last, int tetris_count, int tspins, int max_combos, int holds, double tpm, double lpm) :
+    code(code),
+    mode(mode),
+    mino_placed(mino_placed),
+    elapsed_ms(elapsed_ms),
+    score(score),
+    removed_lines(removed_lines),
+    level_at_last(level_at_last),
+    tetris_count(tetris_count),
+    tspins(tspins),
+    max_combos(max_combos),
+    holds(holds),
+    tpm(tpm),
+    lpm(lpm) {}
 };
 
 class Game {
   public:
-    DisplayParameters dp;
+    DisplayParameters &dp;
 
-    TetrisMode mode;
+    GameMode mode;
 
     std::array<MinoType, 7> cur_bag;
     std::array<MinoType, 7> next_bag;
@@ -730,8 +830,10 @@ class Game {
     int tspins;
     int combos;
     boolean in_b2b;
+    int hold_count;
+    int max_combos;
 
-    Input input;
+    Input &input;
     uint16_t bgcolor;
     TFT_eSPI &screen;
     TFT_eSprite board_sprite;
@@ -740,7 +842,7 @@ class Game {
     TFT_eSprite stats_sprite;
 
   public:
-    (Input input, TFT_eSPI &screen, DisplayParameters params, GameMode mode) :
+    Game(Input input, TFT_eSPI &screen, DisplayParameters params, GameMode mode) :
       dp(params),
 
       mode(mode),
@@ -765,11 +867,13 @@ class Game {
       score(0),
       removed_lines(0),
       starting_level(1),
-      goal(0),
+      goal(mode == GameMode::Endless ? 0 : mode == GameMode::L40 ? 40 : mode == GameMode::L150 ? 150 : 999),
       tetris_count(0),
       tspins(0),
       combos(-1), // combos starts count when 2 consecutive clear happens, and it is counted as "1 combo", so it's good to start with -1
       in_b2b(false),
+      hold_count(0),
+      max_combos(0),
 
       input(input),
       bgcolor(TFT_BLACK),
@@ -846,12 +950,6 @@ class Game {
       return true;
     }
 
-    void pop_new_mino_if_needed(unsigned long now) {
-      if (board.cur_mino_exists()) return;
-      Mino m = next_mino();
-      if (!try_place_mino(m, now)) gameover();
-    }
-
     TSpinKind check_tspin() {
       if (!board.cur_mino->is_T()) return TSpinKind::NONE;
       if (!was_last_move_rotation) return TSpinKind::NONE;
@@ -924,18 +1022,23 @@ class Game {
       return TSpinKind::TSPIN_MINI;
     }
 
-    void lock_mino_and_clear_lines() {
+    boolean lock_mino_and_clear_lines() {
       // T-spin check
       TSpinKind tspin = check_tspin();
       if (tspin == TSpinKind::TSPIN || tspin == TSpinKind::TSPIN_MINI) tspins++;
       last_kick_index = 0; // reset last_kick_index for the next check
 
-      if (!board.lockdown_mino()) gameover();
+      if (!board.lockdown_mino()) return false;
       mino_placed++;
       if (hold_once_tried) hold_once_tried = false;
 
       // delete rows with animation
       auto [count, rows] = board.deletable_rows();
+
+      if (mode != GameMode::Endless) {
+        goal -= count;
+        if (goal <= 0) goal = 0;
+      }
 
       int base_score = 0;
       if (tspin == TSpinKind::TSPIN) {
@@ -962,7 +1065,7 @@ class Game {
 
         // when no lines cleared, B2B, REN, Perfect check are not needed
         score += cur_level * base_score;
-        return;
+        return true;
       }
 
       for (int i = 0; i < 3; i++) {
@@ -988,6 +1091,7 @@ class Game {
 
       // if some lines cleared, record combos
       combos++;
+      if (combos > max_combos) max_combos = combos;
 
       boolean b2b_eligible = (count == 4 || (tspin == TSpinKind::TSPIN_MINI || tspin == TSpinKind::TSPIN));
       boolean b2b_bonus = in_b2b && b2b_eligible;
@@ -1013,18 +1117,59 @@ class Game {
       removed_lines += count;
       if (count == 4) tetris_count++;
       in_b2b = b2b_eligible;
+
+      return true;
     }
 
     int current_level() {
       return starting_level + (removed_lines / 10);
     }
 
-    void gameover() {
-      Serial.printf("Game over!\n");
-      while (true) delay(1000);
+    double current_tpm() {
+      unsigned long elapsed_ms = millis() - game_started_at;
+      double elapsed_min = elapsed_ms / 60000.0;
+      return mino_placed / elapsed_min;
     }
 
-    void start() {
+    double current_lpm() {
+      unsigned long elapsed_ms = millis() - game_started_at;
+      double elapsed_min = elapsed_ms / 60000.0;
+      return removed_lines / elapsed_min;
+    }
+
+    GameResult game_fail() {
+      return game_stats(GameResultCode::Fail);
+    }
+
+    GameResult game_cancel() {
+      return game_stats(GameResultCode::Cancel);
+    }
+
+    GameResult game_clear() {
+      return game_stats(GameResultCode::Clear);
+    }
+
+    GameResult game_stats(GameResultCode code) {
+      return GameResult(
+        code,
+        mode,
+        mino_placed,
+        millis() - game_started_at,
+        score,
+        removed_lines,
+        current_level(),
+        tetris_count,
+        tspins,
+        max_combos,
+        hold_count,
+        current_tpm(),
+        current_lpm()
+      );
+    }
+
+    GameResult start() {
+      screen.fillScreen(bgcolor);
+
       /* hold area */
       hold_sprite.createSprite(dp.hold_sprite_width, dp.hold_sprite_height);
       render_square(dp.hold_box_x, dp.hold_box_y, dp.hold_box_width, dp.hold_box_height);
@@ -1038,7 +1183,7 @@ class Game {
 
       /* stats labels area */
       stats_sprite.createSprite(dp.stats_sprite_width, dp.stats_sprite_height);
-      std::string lbl = mode == TetrisMode::Endless ? dp.lines_label : dp.goal_label;
+      std::string lbl = mode == GameMode::Endless ? dp.lines_label : dp.goal_label;
       render_left_label(lbl,             dp.stats_label_x, dp.lines_or_goal_label_y, dp.stats_font);
       render_left_label(dp.level_label,  dp.stats_label_x, dp.level_label_y,         dp.stats_font);
       render_left_label(dp.tetris_label, dp.stats_label_x, dp.tetris_label_y,        dp.stats_font);
@@ -1069,12 +1214,17 @@ class Game {
 
       game_started_at = millis();
 
+      boolean hard_dropped = false;
+
       while (true) {
         unsigned long now = millis();
         ButtonState btns = input.get();
 
-        // pop mino
-        pop_new_mino_if_needed(now);
+        // pop mino if needed
+        if (!board.cur_mino_exists()) {
+          Mino m = next_mino();
+          if (!try_place_mino(m, now)) return game_fail();
+        }
 
         // check hard drop
         if (btns.UP && !prev_input.UP) {
@@ -1085,87 +1235,87 @@ class Game {
             if(i % 3 == 0) render();
           }
           score += 2 * i;
-          render();
-          lock_mino_and_clear_lines();
-          pop_new_mino_if_needed(now);
-        }
+          hard_dropped = true;
+        } else {
+          // hold
+          // because R button does not exist, uses SELECT press as hold
+          if (btns.SELECT) {
+            if (!hold_once_tried && board.cur_mino_exists()) {
+              hold_once_tried = true;
 
-        // hold
-        // because R button does not exist, uses SELECT press as hold
-        if (btns.SELECT) {
-          if (!hold_once_tried && board.cur_mino_exists()) {
-            hold_once_tried = true;
-
-            // flash animation
-            for (int i = 0; i < 3; i++) {
-              // render flashed (white) lines
-              board.cur_mino->override_base_color(TFT_WHITE);
-              if (hold_mino.has_value()) hold_mino->override_base_color(TFT_WHITE);
-              render();
-              delay(30);
-              // render original lines
-              board.cur_mino->recover_base_color();
-              if (hold_mino.has_value()) hold_mino->recover_base_color();
-              render();
-              delay(30);
-            }
-
-            // temporary save current hold mino
-            std::optional<Mino> temp = hold_mino;
-
-            // next hold mino is current mino
-            hold_mino = Mino::for_board(board.cur_mino->type);
-
-            // next mino is holded one if hold exists, else next_mino();
-            Mino next = temp.has_value() ? *temp : next_mino();
-
-            if (!try_place_mino(next, now)) gameover();
-          }
-        }
-
-        // rotation
-        if (btns.A && !prev_input.A) try_rotate(RotateDirection::CLOCKWISE, now);
-        else if (btns.B && !prev_input.B) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
-
-        // softdrop
-        if (btns.DOWN) {
-          // when DOWN button press held, soft drop needs some interval
-          boolean soft_drop_interval_passed = (now - last_soft_dropped) >= FREE_FALL_MS / 20;
-
-          // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
-          if (!prev_input.DOWN || soft_drop_interval_passed) {
-            if (try_move(MoveDirection::DOWN, 1, now)) score += 1;
-            last_soft_dropped = now;
-          }
-        }
-
-        // free fall
-        if (now - free_fall_timer >= FREE_FALL_MS) {
-          try_move(MoveDirection::DOWN, 1, now);
-        }
-
-        // horizontal move
-        if (btns.RIGHT || btns.LEFT) {
-          MoveDirection dir = btns.RIGHT ? MoveDirection::RIGHT : MoveDirection::LEFT;
-
-          if (btns.RIGHT && btns.LEFT) {
-            // on both pressed, do nothing
-
-          } else if ((btns.RIGHT && !prev_input.RIGHT) || (btns.LEFT && !prev_input.LEFT)) {
-            // when horizontal press changed, just move
-            try_move(dir, 1, now);
-            horizontal_auto_repeat_started = false;
-
-          } else {
-            // when press held, move after some interval
-            if (!horizontal_auto_repeat_started) {
-              if (now - last_horizontally_moved_at >= horizontal_move_first_wait_ms) {
-                try_move(dir, 1, now);
-                horizontal_auto_repeat_started = true;
+              // flash animation
+              for (int i = 0; i < 3; i++) {
+                // render flashed (white) lines
+                board.cur_mino->override_base_color(TFT_WHITE);
+                if (hold_mino.has_value()) hold_mino->override_base_color(TFT_WHITE);
+                render();
+                delay(30);
+                // render original lines
+                board.cur_mino->recover_base_color();
+                if (hold_mino.has_value()) hold_mino->recover_base_color();
+                render();
+                delay(30);
               }
+
+              // temporary save current hold mino
+              std::optional<Mino> temp = hold_mino;
+
+              // next hold mino is current mino
+              hold_mino = Mino::for_board(board.cur_mino->type);
+
+              // next mino is holded one if hold exists, else next_mino();
+              Mino next = temp.has_value() ? *temp : next_mino();
+
+              if (!try_place_mino(next, now)) return game_fail();
+
+              hold_count++;
+            }
+          }
+
+          // rotation
+          if (btns.A && !prev_input.A) try_rotate(RotateDirection::CLOCKWISE, now);
+          else if (btns.B && !prev_input.B) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
+
+          // softdrop
+          if (btns.DOWN) {
+            // when DOWN button press held, soft drop needs some interval
+            boolean soft_drop_interval_passed = (now - last_soft_dropped) >= FREE_FALL_MS / 20;
+
+            // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
+            if (!prev_input.DOWN || soft_drop_interval_passed) {
+              if (try_move(MoveDirection::DOWN, 1, now)) score += 1;
+              last_soft_dropped = now;
+            }
+          }
+
+          // free fall
+          if (now - free_fall_timer >= FREE_FALL_MS) {
+            try_move(MoveDirection::DOWN, 1, now);
+          }
+
+          // horizontal move
+          if (btns.RIGHT || btns.LEFT) {
+            MoveDirection dir = btns.RIGHT ? MoveDirection::RIGHT : MoveDirection::LEFT;
+
+            if (btns.RIGHT && btns.LEFT) {
+              // on both pressed, do nothing
+
+            } else if ((btns.RIGHT && !prev_input.RIGHT) || (btns.LEFT && !prev_input.LEFT)) {
+              // when horizontal press changed, just move
+              try_move(dir, 1, now);
+              horizontal_auto_repeat_started = false;
+
             } else {
-              if (now - last_horizontally_moved_at >= horizontal_move_auto_repeating_wait_ms) {
-                try_move(dir, 1, now);
+              // when press held, move after some interval
+              if (!horizontal_auto_repeat_started) {
+                if (now - last_horizontally_moved_at >= horizontal_move_first_wait_ms) {
+                  try_move(dir, 1, now);
+                  horizontal_auto_repeat_started = true;
+                }
+              } else {
+                if (now - last_horizontally_moved_at >= horizontal_move_auto_repeating_wait_ms) {
+                  try_move(dir, 1, now);
+                }
               }
             }
           }
@@ -1173,8 +1323,9 @@ class Game {
 
         if (board.mino_landed()) {
           if (!lockdown_judging) lockdown_judging = true;
-          if (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit) {
-            lock_mino_and_clear_lines();
+          if (hard_dropped || (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit)) {
+            if (hard_dropped) hard_dropped = false;
+            if (!lock_mino_and_clear_lines()) return game_fail();
           }
         } else if (lockdown_judging) {
           // in case once landed and judge started, but now it's not landed, reset them.
@@ -1185,6 +1336,9 @@ class Game {
 
         render();
         prev_input = btns;
+
+        if (!(mode == GameMode::Endless) && goal <= 0) return game_clear();
+
         yield();
       }
     }
@@ -1322,13 +1476,12 @@ class Game {
 
       // stats
       stats_sprite.fillRect(0, 0, dp.stats_sprite_width, dp.stats_sprite_height, bgcolor);
-      double elapsed_min = elapsed_ms / 60000.0;
       char tpm_str[6];
       char lpm_str[6];
-      snprintf(tpm_str, sizeof(tpm_str), "%.1f", elapsed_ms >= 3000 ? mino_placed / elapsed_min : 0);
-      snprintf(lpm_str, sizeof(lpm_str), "%.1f", elapsed_ms >= 3000 ? removed_lines / elapsed_min : 0);
+      snprintf(tpm_str, sizeof(tpm_str), "%.1f", elapsed_ms >= 3000 ? current_tpm() : 0);
+      snprintf(lpm_str, sizeof(lpm_str), "%.1f", elapsed_ms >= 3000 ? current_lpm() : 0);
 
-      int top_stat = mode == TetrisMode::Endless ? removed_lines : goal;
+      int top_stat = mode == GameMode::Endless ? removed_lines : goal;
       render_right_label_sprite(stats_sprite, std::to_string(top_stat),                dp.stats_x_right_in_sprite, dp.lines_or_goal_y_in_sprite, dp.stats_font);
       render_right_label_sprite(stats_sprite, std::to_string(current_level()),         dp.stats_x_right_in_sprite, dp.level_y_in_sprite,         dp.stats_font);
       render_right_label_sprite(stats_sprite, std::to_string(tetris_count),            dp.stats_x_right_in_sprite, dp.tetris_y_in_sprite,        dp.stats_font);
@@ -1357,52 +1510,162 @@ class Game {
 
 class YomoTetris {
   public:
+    GameMode cur_focus_mode;
     DisplayParameters dp;
     Input input;
-    uint16_t bgcolor;
     TFT_eSPI &screen;
+    TFT_eSprite menu_sprite;
+    TFT_eSprite result_sprite;
 
     YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
+      cur_focus_mode(GameMode::Endless),
       dp(params),
       input(input),
-      bgcolor(TFT_BLACK),
-      screen(screen) {}
-
-    void display_textbox(std::string str, int x, int y, int width, int height, uint8_t font, boolean selected) {
-      if (selected) {
-        screen.fillRect(dp.menu_mode_x, dp.menu_mode_endless_y, dp.menu_mode_width, dp.menu_mode_height, TFT_WHITE);
-        sprite.setTextColor(TFT_BLACK, TFT_WHITE);
-        sprite.setTextDatum(MC_DATUM);
-        sprite.drawString(str.c_str(), x + (width / 2), y + (height / 2), font);
+      screen(screen),
+      menu_sprite(&screen),
+      result_sprite(&screen) {
+        menu_sprite.createSprite(dp.menu_sprite_width, dp.menu_sprite_height);
+        result_sprite.createSprite(dp.result_sprite_width, dp.result_sprite_height);
       }
+
+    void render_menubox(TFT_eSprite& sprite, std::string str, int x, int y, int width, int height, uint8_t font, boolean selected) {
+      uint16_t grid_color = TFT_WHITE;
+      uint16_t bg_color = TFT_BLACK;
+      uint16_t char_color = TFT_WHITE;
+      if (selected) {
+        grid_color = TFT_WHITE;
+        bg_color = TFT_WHITE;
+        char_color = TFT_BLACK;
+      }
+
+      sprite.drawRect(x, y, width, height, grid_color);
+      sprite.fillRect(x+1, y+1, width-2, height-2, bg_color);
+      sprite.setTextColor(char_color, bg_color);
+      sprite.setTextDatum(MC_DATUM);
+      sprite.drawString(str.c_str(), x + (width / 2), y + (height / 2), font);
     }
 
     void menu() {
-      TetrisMode cur_select = TetrisMode::Endless;
-      display_menu("Endless",   dp.menu_mode_x, dp.menu_mode_endless_y, dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::Endless);
-      display_menu("40 Lines",  dp.menu_mode_x, dp.menu_mode_l40_y,     dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::L40);
-      display_menu("150 Lines", dp.menu_mode_x, dp.menu_mode_l150_y,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::L150);
-      display_menu("999 Lines", dp.menu_mode_x, dp.menu_mode_l999_y,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_select == TetrisMode::L999);
-
-      boolean was_A = false;
       boolean was_up = false;
       boolean was_down = false;
-      boolean was_left = false;
-      boolean was_right = false;
       while (true) {
-        if ((input.A && !was_A) || (input.UP && !was_up) || (input.DOWN && !was_down) || (input.LEFT && !was_left) || (input.RIGHT && !was_right)) {
-          if (input.A)
+        render_menubox(menu_sprite, "Endless",   dp.menu_mode_x_in_sprite, dp.menu_mode_endless_y_in_sprite, dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::Endless);
+        render_menubox(menu_sprite, "40 Lines",  dp.menu_mode_x_in_sprite, dp.menu_mode_l40_y_in_sprite,     dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L40);
+        render_menubox(menu_sprite, "150 Lines", dp.menu_mode_x_in_sprite, dp.menu_mode_l150_y_in_sprite,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L150);
+        render_menubox(menu_sprite, "999 Lines", dp.menu_mode_x_in_sprite, dp.menu_mode_l999_y_in_sprite,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L999);
+
+        ButtonState btns = input.get();
+        if (btns.A) return;
+
+        if (btns.UP && !was_up) {
+          if (cur_focus_mode == GameMode::Endless) cur_focus_mode = GameMode::L999;
+          else if (cur_focus_mode == GameMode::L40) cur_focus_mode = GameMode::Endless;
+          else if (cur_focus_mode == GameMode::L150) cur_focus_mode = GameMode::L40;
+          else if (cur_focus_mode == GameMode::L999) cur_focus_mode = GameMode::L150;
+        } else if (btns.DOWN && !was_down) {
+          if (cur_focus_mode == GameMode::Endless) cur_focus_mode = GameMode::L40;
+          else if (cur_focus_mode == GameMode::L40) cur_focus_mode = GameMode::L150;
+          else if (cur_focus_mode == GameMode::L150) cur_focus_mode = GameMode::L999;
+          else if (cur_focus_mode == GameMode::L999) cur_focus_mode = GameMode::Endless;
         }
-        yield();
+
+        was_up = btns.UP;
+        was_down = btns.DOWN;
+
+        menu_sprite.pushSprite(dp.menu_sprite_x, dp.menu_sprite_y);
+
+        delay(10);
+      }
+    }
+
+    void show_result(GameResult result) {
+      result_sprite.drawRect(0, 0, dp.result_sprite_width, dp.result_sprite_height, TFT_WHITE);
+      result_sprite.fillRect(1, 1, dp.result_sprite_width-2, dp.result_sprite_height-2, TFT_BLACK);
+
+      // render labels
+      result_sprite.setTextColor(TFT_WHITE, TFT_BLACK);
+      result_sprite.setTextDatum(TL_DATUM);
+
+      result_sprite.drawString("Score"     , dp.result_label_x_in_sprite, dp.result_score_y_in_sprite    , 1);
+      result_sprite.drawString("Time"      , dp.result_label_x_in_sprite, dp.result_time_y_in_sprite     , 1);
+      result_sprite.drawString("Lines"     , dp.result_label_x_in_sprite, dp.result_lines_y_in_sprite    , 1);
+      result_sprite.drawString("Level"     , dp.result_label_x_in_sprite, dp.result_level_y_in_sprite    , 1);
+      result_sprite.drawString("Tetrises"  , dp.result_label_x_in_sprite, dp.result_tetris_y_in_sprite   , 1);
+      result_sprite.drawString("T-Spins"   , dp.result_label_x_in_sprite, dp.result_tspins_y_in_sprite   , 1);
+      result_sprite.drawString("Max Combos", dp.result_label_x_in_sprite, dp.result_maxcombos_y_in_sprite, 1);
+      result_sprite.drawString("Holds"     , dp.result_label_x_in_sprite, dp.result_holds_y_in_sprite    , 1);
+      result_sprite.drawString("TPM"       , dp.result_label_x_in_sprite, dp.result_tpm_y_in_sprite      , 1);
+      result_sprite.drawString("LPM"       , dp.result_label_x_in_sprite, dp.result_lpm_y_in_sprite      , 1);
+
+      // render values
+      std::string code_str = result.mode == GameMode::Endless ? "Result" : result.code == GameResultCode::Clear ? "Clear!!" : result.code == GameResultCode::Fail ? "Fail..." : "Canceled";
+      uint16_t result_color = result.mode == GameMode::Endless ? TFT_WHITE : result.code == GameResultCode::Clear ? TFT_GREEN : result.code == GameResultCode::Fail ? TFT_ORANGE : TFT_WHITE;
+
+      // code is center with a specific color
+      result_sprite.setTextColor(result_color, TFT_BLACK);
+      result_sprite.setTextDatum(TC_DATUM);
+      result_sprite.drawString(code_str.c_str()                            , dp.result_sprite_width / 2, dp.result_result_y_in_sprite   , 1);
+
+      // others are white, right aligned
+      result_sprite.setTextColor(TFT_WHITE, TFT_BLACK);
+      result_sprite.setTextDatum(TR_DATUM);
+      result_sprite.drawString(std::to_string(result.score).c_str()        , dp.result_value_x_right_in_sprite, dp.result_score_y_in_sprite    , 1);
+
+      int hours = result.elapsed_ms / (1000 * 60 * 60);
+      int minutes = result.elapsed_ms / (1000 * 60);
+      int seconds = (result.elapsed_ms / 1000) % 60;
+      int centis = (result.elapsed_ms % 1000) / 10;
+      char time[12];
+      snprintf(time, sizeof(time), "%02d:%02d:%02d:%02d", hours, minutes, seconds, centis);
+      result_sprite.drawString(time, dp.result_value_x_right_in_sprite, dp.result_time_y_in_sprite     , 1);
+
+      result_sprite.drawString(std::to_string(result.removed_lines).c_str(), dp.result_value_x_right_in_sprite, dp.result_lines_y_in_sprite    , 1);
+      result_sprite.drawString(std::to_string(result.level_at_last).c_str(), dp.result_value_x_right_in_sprite, dp.result_level_y_in_sprite    , 1);
+      result_sprite.drawString(std::to_string(result.tetris_count).c_str() , dp.result_value_x_right_in_sprite, dp.result_tetris_y_in_sprite   , 1);
+      result_sprite.drawString(std::to_string(result.tspins).c_str()       , dp.result_value_x_right_in_sprite, dp.result_tspins_y_in_sprite   , 1);
+      result_sprite.drawString(std::to_string(result.max_combos).c_str()   , dp.result_value_x_right_in_sprite, dp.result_maxcombos_y_in_sprite, 1);
+      result_sprite.drawString(std::to_string(result.holds).c_str()        , dp.result_value_x_right_in_sprite, dp.result_holds_y_in_sprite    , 1);
+
+      char tpm_str[6];
+      char lpm_str[6];
+      snprintf(tpm_str, sizeof(tpm_str), "%.1f", result.tpm);
+      snprintf(lpm_str, sizeof(lpm_str), "%.1f", result.lpm);
+
+      result_sprite.drawString(tpm_str, dp.result_value_x_right_in_sprite, dp.result_tpm_y_in_sprite, 1);
+      result_sprite.drawString(lpm_str, dp.result_value_x_right_in_sprite, dp.result_lpm_y_in_sprite, 1);
+
+      // message
+
+      result_sprite.setTextColor(TFT_GREEN, TFT_BLACK);
+      result_sprite.setTextDatum(TC_DATUM);
+      result_sprite.drawString("Press B for menu", dp.result_sprite_width / 2, dp.result_msg_y_in_sprite, 1);
+
+      result_sprite.pushSprite(dp.result_sprite_x, dp.result_sprite_y);
+
+      while (true) {
+        ButtonState btns = input.get();
+        if (btns.B) return;
+        delay(20);
       }
     }
 
     void start() {
       while (true) {
-        TetrisMode mode = menu();
-        Game game = Game(input, screen, dp, mode);
-        GameResult result = game.start()
+        screen.fillScreen(TFT_BLACK);
+        menu();
+
+        // wait for A button is released
+        while (true) {
+          ButtonState btns = input.get();
+          if (!btns.A) break;
+          delay(10);
+        }
+
+        Game game = Game(input, screen, dp, cur_focus_mode);
+        GameResult result = game.start();
+        delay(1000);
         show_result(result);
+        delay(100);
       }
     }
 };
