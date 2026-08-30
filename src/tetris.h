@@ -421,7 +421,6 @@ class Board {
     }
 };
 
-
 /* triple buffer rendering */
 
 struct MinoRenderData {
