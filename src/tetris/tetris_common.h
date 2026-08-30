@@ -24,14 +24,12 @@ struct BlockPos {
   void left(int distance) { col -= distance; }
 };
 
-class Block {
-  public:
-    uint16_t base_color; // for backup
-    BlockColor color;
+struct Block {
+  uint16_t base_color{0}; // for backup
+  BlockColor color{0, 0, 0};
 
-    Block(BlockColor color) : base_color(color.base), color(color) {}
-    void flash() { color.base = TFT_WHITE; }
-    void stop_flash() { color.base = base_color; }
+  void flash() { color.base = TFT_WHITE; }
+  void stop_flash() { color.base = base_color; }
 };
 
 
@@ -326,7 +324,7 @@ class Board {
           locked_out = true;
           continue;
         }
-        blocks[row][col] = Block(cur_mino->color);
+        blocks[row][col] = Block{cur_mino->color.base, cur_mino->color};
       }
       cur_mino = std::nullopt;
       return !locked_out;
