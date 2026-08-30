@@ -1253,6 +1253,9 @@ class Game {
 
       boolean hard_dropped = false;
 
+      unsigned long fps_counter = 0;
+      unsigned long fps_last_checked = millis();
+
       while (true) {
         unsigned long now = millis();
         ButtonState btns = input.get();
@@ -1373,6 +1376,14 @@ class Game {
 
         render();
         prev_input = btns;
+
+        fps_counter++;
+        if (now - fps_last_checked >= 1000) {
+          Serial.print("FPS: ");
+          Serial.println(fps_counter);
+          fps_counter = 0;
+          fps_last_checked = now;
+        }
 
         if (!(mode == GameMode::Endless) && goal <= 0) return game_clear();
 
