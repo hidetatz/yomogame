@@ -7,36 +7,36 @@
 #include "tetris_common.h"
 
 struct GameSnapshot {
-  bool valid = false;
+  bool valid{false};
 
   // blocks
   std::optional<BlockColor> blocks[20][10];
 
   // current mino and ghost
-  bool has_cur_mino = false;
+  bool has_cur_mino{false};
   std::array<BlockPos, 4> cur_mino_block_pos;
   BlockColor cur_mino_color{0, 0, 0};
-  int hard_drop_distance = 0;
+  int hard_drop_distance{0};
 
   // hold
-  bool has_hold_mino = false;
-  MinoType hold_type = MinoType::T;
+  bool has_hold_mino{false};
+  MinoType hold_type{MinoType::T};
   BlockColor hold_color{0, 0, 0};
 
   // next minos
   std::array<MinoType, 6> next_types{};
 
   // stats
-  int score = 0;
-  int level = 1;
-  int tetris_count = 0;
-  int tspins = 0;
-  int combos = -1;
-  int top_stat = 0;
-  bool is_endless = true;
-  double tpm = 0;
-  double lpm = 0;
-  unsigned long elapsed_ms = 0;
+  int score{0};
+  int level{1};
+  int tetris_count{0};
+  int tspins{0};
+  int combos{-1};
+  int top_stat{0};
+  bool is_endless{true};
+  double tpm{0};
+  double lpm{0};
+  unsigned long elapsed_ms{0};
 };
 
 class TripleBuffer {

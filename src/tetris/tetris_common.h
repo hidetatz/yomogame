@@ -14,17 +14,14 @@ struct BlockColor {
   uint16_t darker;
 };
 
-class BlockPos {
-  public:
-    int row;
-    int col;
-    BlockPos(int row, int col) : row(row), col(col) {}
-    BlockPos() : row(0), col(0) {}
+struct BlockPos {
+  int row = 0;
+  int col = 0;
 
-    void up(int distance) { row -= distance; }
-    void down(int distance) { row += distance; }
-    void right(int distance) { col += distance; }
-    void left(int distance) { col -= distance; }
+  void up(int distance) { row -= distance; }
+  void down(int distance) { row += distance; }
+  void right(int distance) { col += distance; }
+  void left(int distance) { col -= distance; }
 };
 
 class Block {
@@ -90,13 +87,13 @@ class Mino {
     }
 
     static Mino from_type_row_col(MinoType type, int row, int col) {
-      if (type == MinoType::O) return Mino(type, 63456, 63468, 38048, /* yellow */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(0, 0), MinoDirection::NORTH);
-      if (type == MinoType::I) return Mino(type, 1694, 26398, 1010, /* sky blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row, col+3)}}, Pivot(row+0.5, col+1.5), MinoDirection::NORTH);
-      if (type == MinoType::T) return Mino(type, 40989, 49981, 24593, /* purple */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
-      if (type == MinoType::L) return Mino(type, 62242, 62733, 37345, /* orange */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
-      if (type == MinoType::J) return Mino(type, 8254, 29502, 4114, /* blue */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col)}}, Pivot(row, col+1), MinoDirection::NORTH);
-      if (type == MinoType::S) return Mino(type, 6049, 28589, 3200, /* green */ {{BlockPos(row, col), BlockPos(row, col+1), BlockPos(row-1, col+1), BlockPos(row-1, col+2)}}, Pivot(row, col+1), MinoDirection::NORTH);
-      /* if (type == MinoType::Z) */ return Mino(type, 63521, 64301, 36864, /* red */ {{BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
+      if (type == MinoType::O) return Mino(type, 63456, 63468, 38048, /* yellow */ {{BlockPos{row, col}, BlockPos{row, col+1}, BlockPos{row-1, col}, BlockPos{row-1, col+1}}}, Pivot(0, 0), MinoDirection::NORTH);
+      if (type == MinoType::I) return Mino(type, 1694, 26398, 1010, /* sky blue */ {{BlockPos{row, col}, BlockPos{row, col+1}, BlockPos{row, col+2}, BlockPos{row, col+3}}}, Pivot(row+0.5, col+1.5), MinoDirection::NORTH);
+      if (type == MinoType::T) return Mino(type, 40989, 49981, 24593, /* purple */ {{BlockPos{row, col}, BlockPos{row, col+1}, BlockPos{row, col+2}, BlockPos{row-1, col+1}}}, Pivot(row, col+1), MinoDirection::NORTH);
+      if (type == MinoType::L) return Mino(type, 62242, 62733, 37345, /* orange */ {{BlockPos{row, col}, BlockPos{row, col+1}, BlockPos{row, col+2}, BlockPos{row-1, col+2}}}, Pivot(row, col+1), MinoDirection::NORTH);
+      if (type == MinoType::J) return Mino(type, 8254, 29502, 4114, /* blue */ {{BlockPos{row, col}, BlockPos{row, col+1}, BlockPos{row, col+2}, BlockPos{row-1, col}}}, Pivot(row, col+1), MinoDirection::NORTH);
+      if (type == MinoType::S) return Mino(type, 6049, 28589, 3200, /* green */ {{BlockPos{row, col}, BlockPos{row, col+1}, BlockPos{row-1, col+1}, BlockPos{row-1, col+2}}}, Pivot(row, col+1), MinoDirection::NORTH);
+      /* if (type == MinoType::Z) */ return Mino(type, 63521, 64301, 36864, /* red */ {{BlockPos{row, col+1}, BlockPos{row, col+2}, BlockPos{row-1, col}, BlockPos{row-1, col+1}}}, Pivot(row, col+1), MinoDirection::NORTH);
     }
 
     void flash() { color.base = TFT_WHITE; }
