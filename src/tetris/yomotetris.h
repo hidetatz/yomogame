@@ -20,7 +20,7 @@ class Game {
   public:
     TripleBuffer tb;
     SemaphoreHandle_t logic_done_sem;
-    std::atomic<bool> logic_running{false};
+    std::atomic<bool> logic_running{true};
     GameLogic logic;
     GameRenderer renderer;
     TaskHandle_t logic_task_handle;
@@ -41,15 +41,13 @@ class Game {
     GameResult start() {
       renderer.setup_screen();
 
-      logic_running = true;
-
       xTaskCreatePinnedToCore(logic_task_trampoline, "logic", 8192, this, 2, &logic_task_handle, 1);
       xTaskCreatePinnedToCore(render_task_trampoline, "render", 8192, this, 1, &render_task_handle, 1);
 
       xSemaphoreTake(logic_done_sem, portMAX_DELAY);
 
       logic_running = false;
-      vTaskDelay(pdMS_TO_TICKS(50));
+      vTaskDelay(pdMS_TO_TICKS(50)); // wait for rendering thread terminates
 
       return *logic.final_result;
     }
