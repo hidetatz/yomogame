@@ -84,7 +84,6 @@ class GameLogic {
         shuffle_bag(next_bag);
       }
 
-
     void shuffle_bag(std::array<MinoType, 7>& bag) {
       for (int i = 0; i < 7; i++) {
         int r = random(i, 7);
@@ -115,8 +114,7 @@ class GameLogic {
       int level = current_level();
       double frames = pow(60.0, (20.0 - level) / 19.0);
       double g = 1.0 / frames;
-      if (g > 20.0) g = 20.0; // 20Gで頭打ち
-      return g;
+      return std::min(g, 20.0);
     }
 
     void apply_free_fall(unsigned long now) {
@@ -578,7 +576,7 @@ class GameLogic {
 
         fps_counter++;
         if (now - fps_last_checked >= 1000) {
-          Serial.print("FPS: ");
+          Serial.print("Logic Loop FPS: ");
           Serial.println(fps_counter);
           fps_counter = 0;
           fps_last_checked = now;
