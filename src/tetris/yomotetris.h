@@ -46,8 +46,14 @@ class Game {
 
       xSemaphoreTake(logic_done_sem, portMAX_DELAY);
 
+      // wait for rendering finishes
+      unsigned long wait_started = millis();
+      while (tb.rendered_seq < tb.published_seq) {
+        if (millis() - wait_started > 500) break; // timeout
+        vTaskDelay(pdMS_TO_TICKS(2));
+      }
+
       logic_running = false;
-      vTaskDelay(pdMS_TO_TICKS(50)); // wait for rendering thread terminates
 
       return *logic.final_result;
     }
@@ -217,7 +223,7 @@ class YomoTetris {
         Game* game = new Game(cur_focus_mode, input, screen, dp);
         GameResult result = game->start();
         delete game;
-        delay(1000);
+        delay(500);
         show_result(result);
         delay(100);
       }

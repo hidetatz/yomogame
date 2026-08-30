@@ -40,14 +40,15 @@ struct GameSnapshot {
 };
 
 class TripleBuffer {
-  private:
+  public:
     GameSnapshot buffers[3];
     int write_idx;
     int read_idx;
     std::atomic<int> middle_idx;
     std::atomic<bool> has_new{false};
+    std::atomic<uint32_t> published_seq{0};
+    std::atomic<uint32_t> rendered_seq{0};
 
-  public:
     TripleBuffer() : write_idx(0), read_idx(1), middle_idx(2) {}
 
     GameSnapshot& write_buf() { return buffers[write_idx]; }
@@ -57,12 +58,14 @@ class TripleBuffer {
       int old_middle = middle_idx.exchange(new_middle, std::memory_order_acq_rel);
       write_idx = old_middle;
       has_new.store(true, std::memory_order_release);
+      published_seq.fetch_add(1, std::memory_order_release);
     }
 
     GameSnapshot& read_buf() {
       if (has_new.exchange(false, std::memory_order_acq_rel)) {
         int old_read = read_idx;
         read_idx = middle_idx.exchange(old_read, std::memory_order_acq_rel);
+        rendered_seq.fetch_add(1, std::memory_order_release);
       }
       return buffers[read_idx];
     }
