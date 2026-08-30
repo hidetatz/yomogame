@@ -441,7 +441,7 @@ class GameLogic {
 
       unsigned long last_soft_dropped = 0;
       boolean horizontal_auto_repeat_started = false;
-      ButtonState prev_input;
+      ButtonState prev_input = input.get();
       boolean hard_dropped = false;
 
       unsigned long fps_counter = 0;

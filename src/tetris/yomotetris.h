@@ -105,8 +105,10 @@ class YomoTetris {
     }
 
     void menu() {
-      boolean was_up = false;
-      boolean was_down = false;
+      ButtonState initial = input.get();
+      boolean was_up = initial.UP;
+      boolean was_down = initial.DOWN;
+      boolean was_a = initial.A;
       while (true) {
         render_menubox(menu_sprite, "Endless",   dp.menu_mode_x_in_sprite, dp.menu_mode_endless_y_in_sprite, dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::Endless);
         render_menubox(menu_sprite, "40 Lines",  dp.menu_mode_x_in_sprite, dp.menu_mode_l40_y_in_sprite,     dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L40);
@@ -114,7 +116,7 @@ class YomoTetris {
         render_menubox(menu_sprite, "999 Lines", dp.menu_mode_x_in_sprite, dp.menu_mode_l999_y_in_sprite,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L999);
 
         ButtonState btns = input.get();
-        if (btns.A) return;
+        if (btns.A && !was_a) return;
 
         if (btns.UP && !was_up) {
           if (cur_focus_mode == GameMode::Endless) cur_focus_mode = GameMode::L999;
@@ -130,6 +132,7 @@ class YomoTetris {
 
         was_up = btns.UP;
         was_down = btns.DOWN;
+        was_a = btns.A;
 
         menu_sprite.pushSprite(dp.menu_sprite_x, dp.menu_sprite_y);
 
@@ -212,27 +215,12 @@ class YomoTetris {
       while (true) {
         screen.fillScreen(TFT_BLACK);
         menu();
-
-        // wait for A button is released
-        while (true) {
-          ButtonState btns = input.get();
-          if (!btns.A) break;
-          delay(10);
-        }
-
         Game* game = new Game(cur_focus_mode, input, screen, dp);
         GameResult result = game->start();
         delete game;
         if (result.code != GameResultCode::Cancel) {
           delay(500);
           show_result(result);
-        } else {
-          // wait for A button is released
-          while (true) {
-            ButtonState btns = input.get();
-            if (!btns.A) break;
-            delay(10);
-          }
         }
         delay(100);
       }
