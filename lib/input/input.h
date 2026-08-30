@@ -1,34 +1,15 @@
 #pragma once
 #include <Arduino.h>
 
-class ButtonState {
-  public:
-    boolean A;
-    boolean B;
-    boolean START;
-    boolean SELECT;
-    boolean RIGHT;
-    boolean UP;
-    boolean DOWN;
-    boolean LEFT;
-    ButtonState() {
-      A = false;
-      B = false;
-      START = false;
-      SELECT = false;
-      RIGHT = false;
-      UP = false;
-      DOWN = false;
-      LEFT = false;
-    }
-    void APressed() {A = true;}
-    void BPressed() {B = true;}
-    void STARTPressed() {START = true;}
-    void SELECTPressed() {SELECT = true;}
-    void RIGHTPressed() {RIGHT = true;}
-    void UPPressed() {UP = true;}
-    void DOWNPressed() {DOWN = true;}
-    void LEFTPressed() {LEFT = true;}
+struct ButtonState {
+  boolean A{false};
+  boolean B{false};
+  boolean START{false};
+  boolean SELECT{false};
+  boolean RIGHT{false};
+  boolean UP{false};
+  boolean DOWN{false};
+  boolean LEFT{false};
 };
 
 const int BUTTON_COUNT = 8;
@@ -77,15 +58,9 @@ class Input {
         }
       }
 
-      ButtonState bs = ButtonState();
-      if (stable_state[0]) bs.APressed();
-      if (stable_state[1]) bs.BPressed();
-      if (stable_state[2]) bs.STARTPressed();
-      if (stable_state[3]) bs.SELECTPressed();
-      if (stable_state[4]) bs.RIGHTPressed();
-      if (stable_state[5]) bs.UPPressed();
-      if (stable_state[6]) bs.DOWNPressed();
-      if (stable_state[7]) bs.LEFTPressed();
-      return bs;
+      return ButtonState{
+        stable_state[0], stable_state[1], stable_state[2], stable_state[3],
+        stable_state[4], stable_state[5], stable_state[6], stable_state[7]
+      };
     }
 };
