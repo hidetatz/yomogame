@@ -1,9 +1,15 @@
 #pragma once
 
 #include <array>
+#include <atomic>
+#include <cmath>
 #include <optional>
 #include <tuple>
 #include <string>
+
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -32,6 +38,7 @@ class BlockPos {
     int row;
     int col;
     BlockPos(int row, int col) : row(row), col(col) {}
+    BlockPos() : row(0), col(0) {}
 
     void up(int distance) { row -= distance; }
     void down(int distance) { row += distance; }
@@ -449,6 +456,84 @@ class Board {
     }
 };
 
+
+/* triple buffer rendering */
+
+struct BlockRenderData {
+  uint16_t base;
+  uint16_t lighter;
+  uint16_t darker;
+};
+
+struct MinoRenderData {
+  std::array<BlockPos, 4> positions;
+  uint16_t base;
+  uint16_t lighter;
+  uint16_t darker;
+};
+
+struct RenderSnapshot {
+  bool valid = false;
+
+  // blocks
+  std::optional<BlockRenderData> blocks[20][10];
+
+  // current mino and ghost
+  bool has_cur_mino = false;
+  MinoRenderData cur_mino;
+  int hard_drop_distance = 0;
+
+  // hold
+  bool has_hold_mino = false;
+  MinoType hold_type = MinoType::T;
+  BlockRenderData hold_color{0, 0, 0};
+
+  // next minos
+  std::array<MinoType, 6> next_types{};
+
+  // stats
+  int score = 0;
+  int level = 1;
+  int tetris_count = 0;
+  int tspins = 0;
+  int combos = -1;
+  int top_stat = 0;
+  bool is_endless = true;
+  double tpm = 0;
+  double lpm = 0;
+  unsigned long elapsed_ms = 0;
+};
+
+class TripleBuffer {
+  private:
+    RenderSnapshot buffers[3];
+    int write_idx;
+    int read_idx;
+    std::atomic<int> middle_idx;
+    std::atomic<bool> has_new{false};
+
+  public:
+    TripleBuffer() : write_idx(0), read_idx(1), middle_idx(2) {}
+
+    RenderSnapshot& write_buf() { return buffers[write_idx]; }
+
+    void publish() {
+      int new_middle = write_idx;
+      int old_middle = middle_idx.exchange(new_middle, std::memory_order_acq_rel);
+      write_idx = old_middle;
+      has_new.store(true, std::memory_order_release);
+    }
+
+    RenderSnapshot& read_buf() {
+      if (has_new.exchange(false, std::memory_order_acq_rel)) {
+        int old_read = read_idx;
+        read_idx = middle_idx.exchange(old_read, std::memory_order_acq_rel);
+      }
+      return buffers[read_idx];
+    }
+};
+
+
 struct DisplayParameters {
   // menu and result
   const int menu_sprite_x;
@@ -816,6 +901,7 @@ class Game {
     unsigned long last_moved_at;
     unsigned long last_horizontally_moved_at;
     unsigned long free_fall_timer;
+    double free_fall_progress;
     boolean lockdown_judging;
     int move_cnt_while_lockdown_judging;
     boolean hold_once_tried;
@@ -841,6 +927,13 @@ class Game {
     TFT_eSprite hold_sprite;
     TFT_eSprite stats_sprite;
 
+    TripleBuffer triple_buffer;
+    volatile bool game_running;
+    std::optional<GameResult> final_result;
+    SemaphoreHandle_t done_sem;
+    TaskHandle_t logic_task_handle;
+    TaskHandle_t render_task_handle;
+
   public:
     Game(Input &input, TFT_eSPI &screen, DisplayParameters &params, GameMode mode) :
       dp(params),
@@ -858,6 +951,7 @@ class Game {
       last_moved_at(0),
       last_horizontally_moved_at(0),
       free_fall_timer(0),
+      free_fall_progress(0.0),
       lockdown_judging(false),
       move_cnt_while_lockdown_judging(0),
       hold_once_tried(false),
@@ -881,11 +975,19 @@ class Game {
       board_sprite(&screen),
       next_minos_sprite(&screen),
       hold_sprite(&screen),
-      stats_sprite(&screen)
+      stats_sprite(&screen),
+      game_running(false),
+      logic_task_handle(nullptr),
+      render_task_handle(nullptr)
       {
+        done_sem = xSemaphoreCreateBinary(); // 追加
         shuffle_bag(cur_bag);
         shuffle_bag(next_bag);
       }
+
+    ~Game() {
+      vSemaphoreDelete(done_sem);
+    }
 
     void shuffle_bag(std::array<MinoType, 7>& bag) {
       for (int i = 0; i < 7; i++) {
@@ -913,10 +1015,40 @@ class Game {
       return next_bag[idx - 7];
     }
 
+    double current_gravity_g() {
+      int level = current_level();
+      double frames = pow(60.0, (20.0 - level) / 19.0);
+      double g = 1.0 / frames;
+      if (g > 20.0) g = 20.0; // 20Gで頭打ち
+      return g;
+    }
+
+    void apply_free_fall(unsigned long now) {
+      unsigned long elapsed_ms = now - free_fall_timer;
+      if (elapsed_ms == 0) return;
+
+      double g = current_gravity_g();
+      double cells_per_ms = g * 60.0 / 1000.0;
+      free_fall_progress += elapsed_ms * cells_per_ms;
+      free_fall_timer = now;
+
+      int cells_to_drop = (int)free_fall_progress;
+      if (cells_to_drop <= 0) return;
+      free_fall_progress -= cells_to_drop;
+
+      for (int i = 0; i < cells_to_drop; i++) {
+        if (!try_move(MoveDirection::DOWN, 1, now)) {
+          free_fall_progress = 0.0;
+          break;
+        }
+      }
+    }
+
     boolean try_place_mino(Mino m, unsigned long now) {
       if (!board.mino_placable(m)) return false;
       board.place_mino(m);
       free_fall_timer = now;
+      free_fall_progress = 0.0;
       last_moved_at = now;
       lockdown_judging = false;
       move_cnt_while_lockdown_judging = 0;
@@ -1076,16 +1208,16 @@ class Game {
             board.blocks[rows[r]][col]->override_base_color(TFT_WHITE);
           }
         }
-        render();
-        delay(30);
+        publish_snapshot();
+        vTaskDelay(pdMS_TO_TICKS(30));
         // render original lines
         for (int r = 0; r < count; r++) {
           for (int col = 0; col < 10; col++) {
             board.blocks[rows[r]][col]->recover_base_color();
           }
         }
-        render();
-        delay(30);
+        publish_snapshot();
+        vTaskDelay(pdMS_TO_TICKS(30));
       }
       board.clear_lines(rows, count);
 
@@ -1122,7 +1254,7 @@ class Game {
     }
 
     int current_level() {
-      return starting_level + (removed_lines / 10);
+      return starting_level + (removed_lines / 2);
     }
 
     double current_tpm() {
@@ -1244,138 +1376,179 @@ class Game {
       screen.setSwapBytes(true);
       screen.pushImage(dp.yomogi_x, dp.yomogi_y, dp.yomogi_width, dp.yomogi_height, dp.yomogi_image, dp.yomogi_transparent_color);
 
+      game_started_at = millis();
+      game_running = true;
+      final_result = std::nullopt;
+
+      xTaskCreatePinnedToCore(logic_task_trampoline, "tetris_logic", 8192, this, 2, &logic_task_handle, 1);
+      xTaskCreatePinnedToCore(render_task_trampoline, "tetris_render", 8192, this, 1, &render_task_handle, 1);
+
+      xSemaphoreTake(done_sem, portMAX_DELAY);
+
+      game_running = false;
+      vTaskDelay(pdMS_TO_TICKS(50));
+
+      return *final_result;
+    }
+
+    static void logic_task_trampoline(void* param) {
+      static_cast<Game*>(param)->logic_task();
+    }
+
+    static void render_task_trampoline(void* param) {
+      static_cast<Game*>(param)->render_task();
+    }
+
+    void render_task() {
+      const TickType_t period = pdMS_TO_TICKS(16);
+      TickType_t last_wake = xTaskGetTickCount();
+      while (game_running) {
+        RenderSnapshot& snap = triple_buffer.read_buf();
+        if (snap.valid) render_from_snapshot(snap);
+        vTaskDelayUntil(&last_wake, period);
+      }
+      vTaskDelete(NULL);
+    }
+
+    void logic_task() {
       unsigned long last_soft_dropped = 0;
       boolean horizontal_auto_repeat_started = false;
-
       ButtonState prev_input;
-
-      game_started_at = millis();
-
       boolean hard_dropped = false;
 
       unsigned long fps_counter = 0;
       unsigned long fps_last_checked = millis();
 
-      while (true) {
+      while (game_running) {
         unsigned long now = millis();
         ButtonState btns = input.get();
+
+        bool failed = false;
 
         // pop mino if needed
         if (!board.cur_mino_exists()) {
           Mino m = next_mino();
-          if (!try_place_mino(m, now)) return game_fail();
+          if (!try_place_mino(m, now)) failed = true;
         }
 
-        // check hard drop
-        if (btns.UP && !prev_input.UP) {
-          int i = 0;
-          // animation
-          while (try_move(MoveDirection::DOWN, 1, now)) {
-            i++;
-            if(i % 3 == 0) render();
-          }
-          score += 2 * i;
-          hard_dropped = true;
-        } else {
-          // hold
-          // because R button does not exist, uses SELECT press as hold
-          if (btns.SELECT) {
-            if (!hold_once_tried && board.cur_mino_exists()) {
-              hold_once_tried = true;
+        if (!failed) {
+          // check hard drop
+          if (btns.UP && !prev_input.UP) {
+            int i = 0;
+            while (try_move(MoveDirection::DOWN, 1, now)) i++;
+            score += 2 * i;
+            hard_dropped = true;
+          } else {
+            // hold
+            // because R button does not exist, uses SELECT press as hold
+            if (btns.SELECT) {
+              if (!hold_once_tried && board.cur_mino_exists()) {
+                hold_once_tried = true;
 
-              // flash animation
-              for (int i = 0; i < 3; i++) {
-                // render flashed (white) lines
-                board.cur_mino->override_base_color(TFT_WHITE);
-                if (hold_mino.has_value()) hold_mino->override_base_color(TFT_WHITE);
-                render();
-                delay(30);
-                // render original lines
-                board.cur_mino->recover_base_color();
-                if (hold_mino.has_value()) hold_mino->recover_base_color();
-                render();
-                delay(30);
+                // flash animation
+                for (int i = 0; i < 3; i++) {
+                  // render flashed (white) lines
+                  board.cur_mino->override_base_color(TFT_WHITE);
+                  if (hold_mino.has_value()) hold_mino->override_base_color(TFT_WHITE);
+                  publish_snapshot();
+                  vTaskDelay(pdMS_TO_TICKS(30));
+
+                  // render original lines
+                  board.cur_mino->recover_base_color();
+                  if (hold_mino.has_value()) hold_mino->recover_base_color();
+                  publish_snapshot();
+                  vTaskDelay(pdMS_TO_TICKS(30));
+                }
+
+                // temporary save current hold mino
+                std::optional<Mino> temp = hold_mino;
+
+                // next hold mino is current mino
+                hold_mino = Mino::for_board(board.cur_mino->type);
+
+                // next mino is holded one if hold exists, else next_mino();
+                Mino next = temp.has_value() ? *temp : next_mino();
+
+                if (!try_place_mino(next, now)) failed = true;
+                else hold_count++;
+              }
+            }
+
+            if (!failed) {
+              // rotation
+              if (btns.A && !prev_input.A) try_rotate(RotateDirection::CLOCKWISE, now);
+              else if (btns.B && !prev_input.B) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
+
+              // softdrop
+              if (btns.DOWN) {
+                // when DOWN button press held, soft drop needs some interval
+                boolean soft_drop_interval_passed = (now - last_soft_dropped) >= free_fall_ms() / 20;
+
+                // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
+                if (!prev_input.DOWN || soft_drop_interval_passed) {
+                  if (try_move(MoveDirection::DOWN, 1, now)) score += 1;
+                  last_soft_dropped = now;
+                }
               }
 
-              // temporary save current hold mino
-              std::optional<Mino> temp = hold_mino;
+              apply_free_fall(now);
 
-              // next hold mino is current mino
-              hold_mino = Mino::for_board(board.cur_mino->type);
+              // horizontal move
+              if (btns.RIGHT || btns.LEFT) {
+                MoveDirection dir = btns.RIGHT ? MoveDirection::RIGHT : MoveDirection::LEFT;
 
-              // next mino is holded one if hold exists, else next_mino();
-              Mino next = temp.has_value() ? *temp : next_mino();
+                if (btns.RIGHT && btns.LEFT) {
+                  // on both pressed, do nothing
 
-              if (!try_place_mino(next, now)) return game_fail();
-
-              hold_count++;
-            }
-          }
-
-          // rotation
-          if (btns.A && !prev_input.A) try_rotate(RotateDirection::CLOCKWISE, now);
-          else if (btns.B && !prev_input.B) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
-
-          // softdrop
-          if (btns.DOWN) {
-            // when DOWN button press held, soft drop needs some interval
-            boolean soft_drop_interval_passed = (now - last_soft_dropped) >= free_fall_ms() / 20;
-
-            // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
-            if (!prev_input.DOWN || soft_drop_interval_passed) {
-              if (try_move(MoveDirection::DOWN, 1, now)) score += 1;
-              last_soft_dropped = now;
-            }
-          }
-
-          // free fall
-          if (now - free_fall_timer >= free_fall_ms()) {
-            try_move(MoveDirection::DOWN, 1, now);
-          }
-
-          // horizontal move
-          if (btns.RIGHT || btns.LEFT) {
-            MoveDirection dir = btns.RIGHT ? MoveDirection::RIGHT : MoveDirection::LEFT;
-
-            if (btns.RIGHT && btns.LEFT) {
-              // on both pressed, do nothing
-
-            } else if ((btns.RIGHT && !prev_input.RIGHT) || (btns.LEFT && !prev_input.LEFT)) {
-              // when horizontal press changed, just move
-              try_move(dir, 1, now);
-              horizontal_auto_repeat_started = false;
-
-            } else {
-              // when press held, move after some interval
-              if (!horizontal_auto_repeat_started) {
-                if (now - last_horizontally_moved_at >= horizontal_move_first_wait_ms) {
+                } else if ((btns.RIGHT && !prev_input.RIGHT) || (btns.LEFT && !prev_input.LEFT)) {
+                  // when horizontal press changed, just move
                   try_move(dir, 1, now);
-                  horizontal_auto_repeat_started = true;
-                }
-              } else {
-                if (now - last_horizontally_moved_at >= horizontal_move_auto_repeating_wait_ms) {
-                  try_move(dir, 1, now);
+                  horizontal_auto_repeat_started = false;
+
+                } else {
+                  // when press held, move after some interval
+                  if (!horizontal_auto_repeat_started) {
+                    if (now - last_horizontally_moved_at >= horizontal_move_first_wait_ms) {
+                      try_move(dir, 1, now);
+                      horizontal_auto_repeat_started = true;
+                    }
+                  } else {
+                    if (now - last_horizontally_moved_at >= horizontal_move_auto_repeating_wait_ms) {
+                      try_move(dir, 1, now);
+                    }
+                  }
                 }
               }
             }
           }
         }
 
-        if (board.mino_landed()) {
-          if (!lockdown_judging) lockdown_judging = true;
-          if (hard_dropped || (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit)) {
-            if (hard_dropped) hard_dropped = false;
-            if (!lock_mino_and_clear_lines()) return game_fail();
+        boolean cleared = false;
+
+        if (!failed) {
+          if (board.mino_landed()) {
+            if (!lockdown_judging) lockdown_judging = true;
+            if (hard_dropped || (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit)) {
+              if (hard_dropped) hard_dropped = false;
+              if (!lock_mino_and_clear_lines()) failed = true;
+            }
+          } else if (lockdown_judging) {
+            // in case once landed and judge started, but now it's not landed, reset them.
+            // this happens when once landed, but moved horizontally, then it's not landed now
+            lockdown_judging = false;
+            move_cnt_while_lockdown_judging = 0;
           }
-        } else if (lockdown_judging) {
-          // in case once landed and judge started, but now it's not landed, reset them.
-          // this happens when once landed, but moved horizontally, then it's not landed now
-          lockdown_judging = false;
-          move_cnt_while_lockdown_judging = 0;
+          cleared = (!(mode == GameMode::Endless) && goal <= 0);
         }
 
-        render();
+        
+        publish_snapshot();
         prev_input = btns;
+
+        if (failed)  { final_result = game_fail();  break; }
+        if (cleared) { final_result = game_clear(); break; }
+
+        vTaskDelay(1);
 
         fps_counter++;
         if (now - fps_last_checked >= 1000) {
@@ -1384,11 +1557,65 @@ class Game {
           fps_counter = 0;
           fps_last_checked = now;
         }
-
-        if (!(mode == GameMode::Endless) && goal <= 0) return game_clear();
-
-        yield();
       }
+
+      xSemaphoreGive(done_sem);
+      vTaskDelete(NULL);
+    }
+
+    void capture_snapshot(RenderSnapshot& snap) {
+      snap.valid = true;
+
+      // copy blocks
+      for (int r = 0; r < 20; r++) {
+        for (int c = 0; c < 10; c++) {
+          if (board.block_exists(r, c)) {
+            auto& bc = board.blocks[r][c]->color;
+            snap.blocks[r][c] = BlockRenderData{bc.base, bc.lighter, bc.darker};
+          } else {
+            snap.blocks[r][c] = std::nullopt;
+          }
+        }
+      }
+
+      // copy current mino
+      snap.has_cur_mino = board.cur_mino_exists();
+      if (snap.has_cur_mino) {
+        Mino& m = *board.cur_mino;
+        snap.cur_mino.positions = m.positions;
+        snap.cur_mino.base = m.color.base;
+        snap.cur_mino.lighter = m.color.lighter;
+        snap.cur_mino.darker = m.color.darker;
+        snap.hard_drop_distance = board.hard_drop_distance();
+      }
+
+      // copy hold
+      snap.has_hold_mino = hold_mino.has_value();
+      if (snap.has_hold_mino) {
+        snap.hold_type = hold_mino->type;
+        uint16_t base = hold_mino->color.base;
+        snap.hold_color = BlockRenderData{base, hold_mino->color.lighter, hold_mino->color.darker};
+      }
+
+      for (int i = 0; i < 6; i++) snap.next_types[i] = next_mino_type(i);
+
+      snap.score        = score;
+      snap.level        = current_level();
+      snap.tetris_count = tetris_count;
+      snap.tspins       = tspins;
+      snap.combos       = combos;
+      snap.top_stat     = mode == GameMode::Endless ? removed_lines : goal;
+      snap.is_endless   = (mode == GameMode::Endless);
+
+      unsigned long elapsed_ms = millis() - game_started_at;
+      snap.elapsed_ms = elapsed_ms;
+      snap.tpm = elapsed_ms >= 3000 ? current_tpm() : 0;
+      snap.lpm = elapsed_ms >= 3000 ? current_lpm() : 0;
+    }
+
+    void publish_snapshot() {
+      capture_snapshot(triple_buffer.write_buf());
+      triple_buffer.publish();
     }
 
     /*
@@ -1450,10 +1677,6 @@ class Game {
       for (int i = 0; i < 4; i++) render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, block_size, bevel_size, m.color.base, m.color.lighter, m.color.darker);
     }
 
-    void render_mino_on_board(Mino m) {
-      render_mino_on_sprite_with_offset(board_sprite, m, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel);
-    }
-
     void render_mino_on_next_minos(TFT_eSprite& sprite, Mino m, int x_offset, int y_offset) {
       render_mino_on_sprite_with_offset(sprite, m, x_offset, y_offset, dp.next_minos_mino_block_size, dp.next_minos_mino_bevel);
     }
@@ -1462,99 +1685,102 @@ class Game {
       render_mino_on_sprite_with_offset(hold_sprite, m, x_offset, y_offset, dp.hold_mino_block_size, dp.hold_mino_bevel);
     }
 
-    void render_ghost_mino_on_board(Mino m, int hard_drop_distance) {
-      uint16_t color = m.overridden_color.has_value() ? *m.overridden_color : m.color.base;
-      for (int i = 0; i < 4; i++) render_ghost_block(board_sprite, m.positions[i].row+hard_drop_distance, m.positions[i].col, dp.board_mino_block_size, color);
-    }
+    //   Mino m = Mino::for_hold_box(hold_mino->type);
+    //   // in case hold mino color is overridden. This is needed because this does not directly renders hold_mino but
+    //   // it creates a new Mino instance m. This is not a good design
+    //   m.color = hold_mino->color;
+    //   int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
+    //   int y_offset = m.is_I() ? (dp.hold_mino_block_size / 2) : dp.hold_mino_block_size;
+    //   render_mino_on_hold_box(m, x_offset, y_offset);
+    // }
 
-    void render_blocks_on_board() {
-      for (int row = 0; row < 20; row++) {
-        for (int col = 0; col < 10; col++) {
-          if (!board.block_exists(row, col)) render_empty_block(board_sprite, row, col, dp.board_mino_block_size);
-          else render_block(board_sprite, row, col, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel, board.blocks[row][col]->color.base, board.blocks[row][col]->color.lighter, board.blocks[row][col]->color.darker);
-        }
+    void render_mino_data_on_sprite(TFT_eSprite& sprite, const MinoRenderData& m, int x_offset, int y_offset, int block_size, int bevel_size) {
+      for (int i = 0; i < 4; i++) {
+        render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, block_size, bevel_size, m.base, m.lighter, m.darker);
       }
     }
 
-    void render_next_minos() {
-      for (int i = 0; i < 6; i++) {
-        Mino m = Mino::for_next_minos(next_mino_type(i));
-        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.next_minos_mino_block_size : dp.next_minos_mino_block_size / 2;
-        int y_offset = m.is_I() ? (dp.next_minos_mino_block_size / 2) : dp.next_minos_mino_block_size;
-        if (i == 0) render_mino_on_next_minos(next_minos_sprite, m, x_offset, dp.next_minos_mino_y0_in_sprite + y_offset);
-        if (i == 1) render_mino_on_next_minos(next_minos_sprite, m, x_offset, dp.next_minos_mino_y1_in_sprite + y_offset);
-        if (i == 2) render_mino_on_next_minos(next_minos_sprite, m, x_offset, dp.next_minos_mino_y2_in_sprite + y_offset);
-        if (i == 3) render_mino_on_next_minos(next_minos_sprite, m, x_offset, dp.next_minos_mino_y3_in_sprite + y_offset);
-        if (i == 4) render_mino_on_next_minos(next_minos_sprite, m, x_offset, dp.next_minos_mino_y4_in_sprite + y_offset);
-        if (i == 5) render_mino_on_next_minos(next_minos_sprite, m, x_offset, dp.next_minos_mino_y5_in_sprite + y_offset);
+    void render_ghost_from_data(const MinoRenderData& m, int hard_drop_distance) {
+      for (int i = 0; i < 4; i++) {
+        render_ghost_block(board_sprite, m.positions[i].row + hard_drop_distance, m.positions[i].col, dp.board_mino_block_size, m.base);
       }
     }
 
-    void render_hold_mino() {
-      Mino m = Mino::for_hold_box(hold_mino->type);
-      // in case hold mino color is overridden. This is needed because this does not directly renders hold_mino but
-      // it creates a new Mino instance m. This is not a good design
-      m.color = hold_mino->color;
-      int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
-      int y_offset = m.is_I() ? (dp.hold_mino_block_size / 2) : dp.hold_mino_block_size;
-      render_mino_on_hold_box(m, x_offset, y_offset);
-    }
-
-    void render() {
-      /* left side */
-
+    void render_from_snapshot(const RenderSnapshot& snap) {
       // hold
       hold_sprite.fillSprite(bgcolor);
-      if (hold_mino.has_value()) {
-        render_hold_mino();
+      if (snap.has_hold_mino) {
+        Mino m = Mino::for_hold_box(snap.hold_type);
+        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
+        int y_offset = m.is_I() ? (dp.hold_mino_block_size / 2) : dp.hold_mino_block_size;
+        m.color = BlockColor(snap.hold_color.base, snap.hold_color.lighter, snap.hold_color.darker);
+        render_mino_on_hold_box(m, x_offset, y_offset);
         hold_sprite.pushSprite(dp.hold_sprite_x, dp.hold_sprite_y);
       }
 
       // score
-      render_right_label(std::to_string(score), dp.score_time_x_right, dp.score_y, dp.stats_font);
+      render_right_label(std::to_string(snap.score), dp.score_time_x_right, dp.score_y, dp.stats_font);
 
-      // time
-      unsigned long elapsed_ms = millis() - game_started_at;
-      int minutes = elapsed_ms / (1000 * 60);
-      int seconds = (elapsed_ms / 1000) % 60;
-      int centis = (elapsed_ms % 1000) / 10;
-      char time[9];
-      snprintf(time, sizeof(time), "%02d:%02d:%02d", minutes, seconds, centis);
-      render_right_label(time, dp.score_time_x_right, dp.time_y, dp.stats_font);
+      /* time */
+      int minutes = snap.elapsed_ms / (1000 * 60);
+      int seconds = (snap.elapsed_ms / 1000) % 60;
+      int centis  = (snap.elapsed_ms % 1000) / 10;
+      char time_str[9];
+      snprintf(time_str, sizeof(time_str), "%02d:%02d:%02d", minutes, seconds, centis);
+      render_right_label(time_str, dp.score_time_x_right, dp.time_y, dp.stats_font);
 
-      // stats
+      /* stats */
       stats_sprite.fillRect(0, 0, dp.stats_sprite_width, dp.stats_sprite_height, bgcolor);
-      char tpm_str[6];
-      char lpm_str[6];
-      snprintf(tpm_str, sizeof(tpm_str), "%.1f", elapsed_ms >= 3000 ? current_tpm() : 0);
-      snprintf(lpm_str, sizeof(lpm_str), "%.1f", elapsed_ms >= 3000 ? current_lpm() : 0);
+      char tpm_str[6], lpm_str[6];
+      snprintf(tpm_str, sizeof(tpm_str), "%.1f", snap.tpm);
+      snprintf(lpm_str, sizeof(lpm_str), "%.1f", snap.lpm);
 
-      int top_stat = mode == GameMode::Endless ? removed_lines : goal;
-      render_right_label_sprite(stats_sprite, std::to_string(top_stat),                dp.stats_x_right_in_sprite, dp.lines_or_goal_y_in_sprite, dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(current_level()),         dp.stats_x_right_in_sprite, dp.level_y_in_sprite,         dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(tetris_count),            dp.stats_x_right_in_sprite, dp.tetris_y_in_sprite,        dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(tspins),                  dp.stats_x_right_in_sprite, dp.tspin_y_in_sprite,         dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(combos < 0 ? 0 : combos), dp.stats_x_right_in_sprite, dp.combo_y_in_sprite,         dp.stats_font);
-      render_right_label_sprite(stats_sprite, tpm_str,                                 dp.stats_x_right_in_sprite, dp.tpm_y_in_sprite,           dp.stats_font);
-      render_right_label_sprite(stats_sprite, lpm_str,                                 dp.stats_x_right_in_sprite, dp.lpm_y_in_sprite,           dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(snap.top_stat),                     dp.stats_x_right_in_sprite, dp.lines_or_goal_y_in_sprite, dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(snap.level),                         dp.stats_x_right_in_sprite, dp.level_y_in_sprite,         dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(snap.tetris_count),                  dp.stats_x_right_in_sprite, dp.tetris_y_in_sprite,        dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(snap.tspins),                        dp.stats_x_right_in_sprite, dp.tspin_y_in_sprite,         dp.stats_font);
+      render_right_label_sprite(stats_sprite, std::to_string(snap.combos < 0 ? 0 : snap.combos),  dp.stats_x_right_in_sprite, dp.combo_y_in_sprite,         dp.stats_font);
+      render_right_label_sprite(stats_sprite, tpm_str,                                            dp.stats_x_right_in_sprite, dp.tpm_y_in_sprite,           dp.stats_font);
+      render_right_label_sprite(stats_sprite, lpm_str,                                            dp.stats_x_right_in_sprite, dp.lpm_y_in_sprite,           dp.stats_font);
       stats_sprite.pushSprite(dp.stats_sprite_x, dp.stats_sprite_y);
 
       /* board */
-
       board_sprite.fillSprite(bgcolor);
-      render_blocks_on_board();
-      if (board.cur_mino_exists()) {
-        render_ghost_mino_on_board(*board.cur_mino, board.hard_drop_distance());
-        render_mino_on_board(*board.cur_mino);
+      for (int row = 0; row < 20; row++) {
+        for (int col = 0; col < 10; col++) {
+          if (!snap.blocks[row][col].has_value()) {
+            render_empty_block(board_sprite, row, col, dp.board_mino_block_size);
+          } else {
+            auto& c = *snap.blocks[row][col];
+            render_block(board_sprite, row, col, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel, c.base, c.lighter, c.darker);
+          }
+        }
+      }
+      if (snap.has_cur_mino) {
+        render_ghost_from_data(snap.cur_mino, snap.hard_drop_distance);
+        render_mino_data_on_sprite(board_sprite, snap.cur_mino, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel);
       }
       board_sprite.pushSprite(dp.board_sprite_x, dp.board_sprite_y);
 
-      /* next mino */
+      /* next minos(色は上書きされないので通常のMinoで良い) */
       next_minos_sprite.fillSprite(bgcolor);
-      render_next_minos();
+      for (int i = 0; i < 6; i++) {
+        Mino m = Mino::for_next_minos(snap.next_types[i]);
+        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.next_minos_mino_block_size : dp.next_minos_mino_block_size / 2;
+        int y_offset = m.is_I() ? (dp.next_minos_mino_block_size / 2) : dp.next_minos_mino_block_size;
+        int y_in_sprite =
+          i == 0 ? dp.next_minos_mino_y0_in_sprite :
+          i == 1 ? dp.next_minos_mino_y1_in_sprite :
+          i == 2 ? dp.next_minos_mino_y2_in_sprite :
+          i == 3 ? dp.next_minos_mino_y3_in_sprite :
+          i == 4 ? dp.next_minos_mino_y4_in_sprite : dp.next_minos_mino_y5_in_sprite;
+        render_mino_on_next_minos(next_minos_sprite, m, x_offset, y_in_sprite + y_offset);
+      }
       next_minos_sprite.pushSprite(dp.next_minos_sprite_x, dp.next_minos_sprite_y);
     }
 };
+
+/* tetris main */
 
 class YomoTetris {
   public:
@@ -1709,8 +1935,9 @@ class YomoTetris {
           delay(10);
         }
 
-        Game game = Game(input, screen, dp, cur_focus_mode);
-        GameResult result = game.start();
+        Game* game = new Game(input, screen, dp, cur_focus_mode);
+        GameResult result = game->start();
+        delete game;
         delay(1000);
         show_result(result);
         delay(100);
