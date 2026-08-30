@@ -46,19 +46,12 @@ class BlockPos {
 
 class Block {
   public:
-    std::optional<uint16_t> overridden_color;
+    uint16_t base_color; // for backup
     BlockColor color;
-    Block(BlockColor color) : color(color) {}
 
-    void override_base_color(uint16_t c) {
-      overridden_color = color.base;
-      color.base = c;
-    }
-
-    void recover_base_color() {
-      color.base = *overridden_color;
-      overridden_color = std::nullopt;
-    }
+    Block(BlockColor color) : base_color(color.base), color(color) {}
+    void flash() { color.base = TFT_WHITE; }
+    void stop_flash() { color.base = base_color; }
 };
 
 enum class MinoDirection {
@@ -91,13 +84,13 @@ class Pivot {
 class Mino {
   public:
     MinoType type;
+    uint16_t base_color; // for backup
     BlockColor color;
-    std::optional<uint16_t> overridden_color;
     std::array<BlockPos, 4> positions;
     Pivot pivot;
     MinoDirection cur_direction;
 
-    Mino(MinoType type, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color{base_color, lighter_color, darker_color}, positions(positions), pivot(pivot), type(type), cur_direction(direction) {}
+    Mino(MinoType type, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : base_color(base_color), color{base_color, lighter_color, darker_color}, positions(positions), pivot(pivot), type(type), cur_direction(direction) {}
 
     static Mino for_board(MinoType type) {
       return Mino::from_type_row_col(type, 0, type == MinoType::O ? 4 : 3);
@@ -121,6 +114,9 @@ class Mino {
       /* if (type == MinoType::Z) */ return Mino(type, 63521, 64301, 36864, /* red */ {{BlockPos(row, col+1), BlockPos(row, col+2), BlockPos(row-1, col), BlockPos(row-1, col+1)}}, Pivot(row, col+1), MinoDirection::NORTH);
     }
 
+    void flash() { color.base = TFT_WHITE; }
+    void stop_flash() { color.base = base_color; }
+
     void up(int distance) {
       for (int i = 0; i < 4; i++) positions[i].up(distance);
       pivot.up(distance);
@@ -141,17 +137,9 @@ class Mino {
       pivot.left(distance);
     }
 
-    boolean is_O() {
-      return type == MinoType::O;
-    }
-
-    boolean is_I() {
-      return type == MinoType::I;
-    }
-
-    boolean is_T() {
-      return type == MinoType::T;
-    }
+    boolean is_O() { return type == MinoType::O; }
+    boolean is_I() { return type == MinoType::I; }
+    boolean is_T() { return type == MinoType::T; }
 
     std::array<int, 8> get_rotated_blocks_pos(RotateDirection dir) {
       std::array<int, 8> result;
@@ -269,16 +257,6 @@ class Mino {
       if (cur_direction == MinoDirection::WEST  && dir == RotateDirection::COUNTER_CLOCKWISE && i == 3) return { 0,  2};
       /* if (cur_direction == MinoDirection::WEST  && dir == RotateDirection::COUNTER_CLOCKWISE && i == 4) */ return {-1,  2};
     }
-
-    void override_base_color(uint16_t c) {
-      overridden_color = color.base;
-      color.base = c;
-    }
-
-    void recover_base_color() {
-      color.base = *overridden_color;
-      overridden_color = std::nullopt;
-    }
 };
 
 class Board {
@@ -287,13 +265,8 @@ class Board {
     std::optional<Block> blocks[20][10]; // block position is managed by the index in blocks, not BlockPos
     Board() {}
 
-    boolean cur_mino_exists() {
-      return cur_mino.has_value();
-    }
-
-    boolean block_exists(int row, int col) {
-      return blocks[row][col].has_value();
-    }
+    boolean cur_mino_exists() { return cur_mino.has_value(); }
+    boolean block_exists(int row, int col) { return blocks[row][col].has_value(); }
 
     boolean block_placable_at(int row, int col) {
       if (col < 0 || 10 <= col || 20 <= row) return false;
@@ -313,9 +286,7 @@ class Board {
              block_placable_at(m.positions[3].row, m.positions[3].col);
     }
 
-    void place_mino(Mino m) {
-      cur_mino = m;
-    }
+    void place_mino(Mino m) { cur_mino = m; }
 
     boolean can_move_mino(MoveDirection dir, int distance) {
       for (int i = 0; i < 4; i++) {
@@ -361,9 +332,7 @@ class Board {
       return {false, 0};
     }
 
-    boolean mino_landed() {
-      return !can_move_mino(MoveDirection::DOWN, 1);
-    }
+    boolean mino_landed() { return !can_move_mino(MoveDirection::DOWN, 1); }
 
     boolean lockdown_mino() {
       boolean locked_out = false;
@@ -416,9 +385,7 @@ class Board {
       return {count, rows};
     }
 
-    void delete_block(int row, int col) {
-      blocks[row][col] = std::nullopt;
-    }
+    void delete_block(int row, int col) { blocks[row][col] = std::nullopt; }
 
     void copy_row(int from, int to) {
       if (from == to) return;
@@ -1197,7 +1164,7 @@ class Game {
         // render flashed (white) lines
         for (int r = 0; r < count; r++) {
           for (int col = 0; col < 10; col++) {
-            board.blocks[rows[r]][col]->override_base_color(TFT_WHITE);
+            board.blocks[rows[r]][col]->flash();
           }
         }
         publish_snapshot();
@@ -1205,7 +1172,7 @@ class Game {
         // render original lines
         for (int r = 0; r < count; r++) {
           for (int col = 0; col < 10; col++) {
-            board.blocks[rows[r]][col]->recover_base_color();
+            board.blocks[rows[r]][col]->stop_flash();
           }
         }
         publish_snapshot();
@@ -1440,14 +1407,14 @@ class Game {
                 // flash animation
                 for (int i = 0; i < 3; i++) {
                   // render flashed (white) lines
-                  board.cur_mino->override_base_color(TFT_WHITE);
-                  if (hold_mino.has_value()) hold_mino->override_base_color(TFT_WHITE);
+                  board.cur_mino->flash();
+                  if (hold_mino.has_value()) hold_mino->flash();
                   publish_snapshot();
                   vTaskDelay(pdMS_TO_TICKS(30));
 
                   // render original lines
-                  board.cur_mino->recover_base_color();
-                  if (hold_mino.has_value()) hold_mino->recover_base_color();
+                  board.cur_mino->stop_flash();
+                  if (hold_mino.has_value()) hold_mino->stop_flash();
                   publish_snapshot();
                   vTaskDelay(pdMS_TO_TICKS(30));
                 }
