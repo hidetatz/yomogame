@@ -11,7 +11,6 @@ class ButtonState {
     boolean UP;
     boolean DOWN;
     boolean LEFT;
-
     ButtonState() {
       A = false;
       B = false;
@@ -32,42 +31,61 @@ class ButtonState {
     void LEFTPressed() {LEFT = true;}
 };
 
+const int BUTTON_COUNT = 8;
+
 class Input {
   private:
-   int pinA;
-   int pinB;
-   int pinSTART;
-   int pinSELECT;
-   int pinRIGHT;
-   int pinUP;
-   int pinDOWN;
-   int pinLEFT;
+    int pins[BUTTON_COUNT];
+
+    boolean stable_state[BUTTON_COUNT];
+    boolean last_raw_state[BUTTON_COUNT];
+    unsigned long last_change_at[BUTTON_COUNT];
+
+    const unsigned long debounce_ms = 5;
 
   public:
-    Input(int pinA, int pinB, int pinSTART, int pinSELECT, int pinRIGHT, int pinUP, int pinDOWN, int pinLEFT) :
-      pinA(pinA), pinB(pinB), pinSTART(pinSTART), pinSELECT(pinSELECT), pinRIGHT(pinRIGHT), pinUP(pinUP), pinDOWN(pinDOWN), pinLEFT(pinLEFT) {
-        pinMode(pinA, INPUT_PULLUP);
-        pinMode(pinB, INPUT_PULLUP);
-        pinMode(pinSTART, INPUT_PULLUP);
-        pinMode(pinSELECT, INPUT_PULLUP);
-        pinMode(pinRIGHT, INPUT_PULLUP);
-        pinMode(pinUP, INPUT_PULLUP);
-        pinMode(pinDOWN, INPUT_PULLUP);
-        pinMode(pinLEFT, INPUT_PULLUP);
+    Input(int pinA, int pinB, int pinSTART, int pinSELECT, int pinRIGHT, int pinUP, int pinDOWN, int pinLEFT) {
+      pins[0] = pinA;
+      pins[1] = pinB;
+      pins[2] = pinSTART;
+      pins[3] = pinSELECT;
+      pins[4] = pinRIGHT;
+      pins[5] = pinUP;
+      pins[6] = pinDOWN;
+      pins[7] = pinLEFT;
+
+      unsigned long now = millis();
+      for (int i = 0; i < BUTTON_COUNT; i++) {
+        pinMode(pins[i], INPUT_PULLUP);
+        stable_state[i] = false;
+        last_raw_state[i] = false;
+        last_change_at[i] = now;
       }
+    }
 
     ButtonState get() {
+      unsigned long now = millis();
+
+      for (int i = 0; i < BUTTON_COUNT; i++) {
+        boolean raw = (digitalRead(pins[i]) == LOW);
+
+        if (raw != last_raw_state[i]) {
+          last_raw_state[i] = raw;
+          last_change_at[i] = now;
+        } else if (raw != stable_state[i] && (now - last_change_at[i]) >= debounce_ms) {
+          stable_state[i] = raw;
+        }
+      }
+
       ButtonState bs = ButtonState();
-      if (digitalRead(pinA) == LOW) bs.APressed();
-      if (digitalRead(pinB) == LOW) bs.BPressed();
-      if (digitalRead(pinSTART) == LOW) bs.STARTPressed();
-      if (digitalRead(pinSELECT) == LOW) bs.SELECTPressed();
-      if (digitalRead(pinRIGHT) == LOW) bs.RIGHTPressed();
-      if (digitalRead(pinUP) == LOW) bs.UPPressed();
-      if (digitalRead(pinDOWN) == LOW) bs.DOWNPressed();
-      if (digitalRead(pinLEFT) == LOW) bs.LEFTPressed();
+      if (stable_state[0]) bs.APressed();
+      if (stable_state[1]) bs.BPressed();
+      if (stable_state[2]) bs.STARTPressed();
+      if (stable_state[3]) bs.SELECTPressed();
+      if (stable_state[4]) bs.RIGHTPressed();
+      if (stable_state[5]) bs.UPPressed();
+      if (stable_state[6]) bs.DOWNPressed();
+      if (stable_state[7]) bs.LEFTPressed();
       return bs;
     }
 };
-
-
