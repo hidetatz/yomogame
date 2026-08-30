@@ -842,7 +842,7 @@ class Game {
     TFT_eSprite stats_sprite;
 
   public:
-    Game(Input input, TFT_eSPI &screen, DisplayParameters params, GameMode mode) :
+    Game(Input &input, TFT_eSPI &screen, DisplayParameters &params, GameMode mode) :
       dp(params),
 
       mode(mode),
