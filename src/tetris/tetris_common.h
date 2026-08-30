@@ -32,16 +32,14 @@ struct Block {
   void stop_flash() { color.base = base_color; }
 };
 
-
-class Pivot {
-  public:
-    float row;
-    float col;
-    Pivot(float row, float col) : row(row), col(col) {}
-    void up(int distance) { row -= distance; }
-    void down(int distance) { row += distance; }
-    void right(int distance) { col += distance; }
-    void left(int distance) { col -= distance; }
+struct Pivot {
+  float row{0.0};
+  float col{0.0};
+  Pivot(float row, float col) : row(row), col(col) {}
+  void up(int distance) { row -= distance; }
+  void down(int distance) { row += distance; }
+  void right(int distance) { col += distance; }
+  void left(int distance) { col -= distance; }
 };
 
 enum class MinoDirection {
