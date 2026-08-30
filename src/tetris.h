@@ -430,7 +430,7 @@ struct MinoRenderData {
   uint16_t darker;
 };
 
-struct RenderSnapshot {
+struct Snapshot {
   bool valid = false;
 
   // blocks
@@ -464,7 +464,7 @@ struct RenderSnapshot {
 
 class TripleBuffer {
   private:
-    RenderSnapshot buffers[3];
+    Snapshot buffers[3];
     int write_idx;
     int read_idx;
     std::atomic<int> middle_idx;
@@ -473,7 +473,7 @@ class TripleBuffer {
   public:
     TripleBuffer() : write_idx(0), read_idx(1), middle_idx(2) {}
 
-    RenderSnapshot& write_buf() { return buffers[write_idx]; }
+    Snapshot& write_buf() { return buffers[write_idx]; }
 
     void publish() {
       int new_middle = write_idx;
@@ -482,7 +482,7 @@ class TripleBuffer {
       has_new.store(true, std::memory_order_release);
     }
 
-    RenderSnapshot& read_buf() {
+    Snapshot& read_buf() {
       if (has_new.exchange(false, std::memory_order_acq_rel)) {
         int old_read = read_idx;
         read_idx = middle_idx.exchange(old_read, std::memory_order_acq_rel);
@@ -1361,7 +1361,7 @@ class Game {
       const TickType_t period = pdMS_TO_TICKS(16);
       TickType_t last_wake = xTaskGetTickCount();
       while (game_running) {
-        RenderSnapshot& snap = triple_buffer.read_buf();
+        Snapshot& snap = triple_buffer.read_buf();
         if (snap.valid) render_from_snapshot(snap);
         vTaskDelayUntil(&last_wake, period);
       }
@@ -1521,7 +1521,7 @@ class Game {
       vTaskDelete(NULL);
     }
 
-    void capture_snapshot(RenderSnapshot& snap) {
+    void capture_snapshot(Snapshot& snap) {
       snap.valid = true;
 
       // copy blocks
@@ -1655,7 +1655,7 @@ class Game {
       }
     }
 
-    void render_from_snapshot(const RenderSnapshot& snap) {
+    void render_from_snapshot(const Snapshot& snap) {
       // hold
       hold_sprite.fillSprite(bgcolor);
       if (snap.has_hold_mino) {
