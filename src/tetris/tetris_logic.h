@@ -52,7 +52,6 @@ class GameLogic {
     int score{0};
     int removed_lines{0};
     int starting_level{1};
-    int goal;
     int tetris_count{0};
     int tspins{0};
     int combos{-1}; // combos starts count when 2 consecutive clear happens, and it is counted as "1 combo", so it's good to start with -1
@@ -77,7 +76,6 @@ class GameLogic {
       mode(mode),
       cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
-      goal(mode == GameMode::Endless ? 0 : mode == GameMode::L40 ? 40 : mode == GameMode::L150 ? 150 : 999),
       input(input),
       triple_buffer(tb),
       done_sem(logic_done_sem)
@@ -252,6 +250,11 @@ class GameLogic {
       return TSpinKind::TSPIN_MINI;
     }
 
+    int current_goal() {
+      int goal = mode == GameMode::Endless ? 0 : mode == GameMode::L40 ? 40 : mode == GameMode::L150 ? 150 : 999;
+      return goal - removed_lines;
+    }
+
     boolean lock_mino_and_clear_lines() {
       // T-spin check
       TSpinKind tspin = check_tspin();
@@ -264,11 +267,6 @@ class GameLogic {
 
       // delete rows with animation
       auto [count, rows] = board.deletable_rows();
-
-      if (mode != GameMode::Endless) {
-        goal -= count;
-        if (goal <= 0) goal = 0;
-      }
 
       int base_score = 0;
       if (tspin == TSpinKind::TSPIN) {
@@ -566,7 +564,7 @@ class GameLogic {
             lockdown_judging = false;
             move_cnt_while_lockdown_judging = 0;
           }
-          cleared = (!(mode == GameMode::Endless) && goal <= 0);
+          cleared = (!(mode == GameMode::Endless) && current_goal() <= 0);
         }
 
         
@@ -630,7 +628,7 @@ class GameLogic {
       snap.tetris_count = tetris_count;
       snap.tspins       = tspins;
       snap.combos       = combos;
-      snap.top_stat     = mode == GameMode::Endless ? removed_lines : goal;
+      snap.top_stat     = mode == GameMode::Endless ? removed_lines : current_goal();
       snap.is_endless   = (mode == GameMode::Endless);
 
       unsigned long elapsed_ms = millis() - game_started_at;
