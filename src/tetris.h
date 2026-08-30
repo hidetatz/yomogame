@@ -24,12 +24,10 @@
  */
 
 // color of block in tetrimino
-class BlockColor {
-  public:
-    uint16_t base;
-    uint16_t lighter;
-    uint16_t darker;
-    BlockColor(uint16_t base, uint16_t lighter, uint16_t darker) : base(base), lighter(lighter), darker(darker) {}
+struct BlockColor {
+  uint16_t base;
+  uint16_t lighter;
+  uint16_t darker;
 };
 
 // block position in a board
@@ -99,7 +97,7 @@ class Mino {
     Pivot pivot;
     MinoDirection cur_direction;
 
-    Mino(MinoType type, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color(base_color, lighter_color, darker_color), positions(positions), pivot(pivot), type(type), cur_direction(direction) {}
+    Mino(MinoType type, uint16_t base_color, uint16_t lighter_color, uint16_t darker_color, std::array<BlockPos, 4> positions, Pivot pivot, MinoDirection direction) : color{base_color, lighter_color, darker_color}, positions(positions), pivot(pivot), type(type), cur_direction(direction) {}
 
     static Mino for_board(MinoType type) {
       return Mino::from_type_row_col(type, 0, type == MinoType::O ? 4 : 3);
@@ -459,12 +457,6 @@ class Board {
 
 /* triple buffer rendering */
 
-struct BlockRenderData {
-  uint16_t base;
-  uint16_t lighter;
-  uint16_t darker;
-};
-
 struct MinoRenderData {
   std::array<BlockPos, 4> positions;
   uint16_t base;
@@ -476,7 +468,7 @@ struct RenderSnapshot {
   bool valid = false;
 
   // blocks
-  std::optional<BlockRenderData> blocks[20][10];
+  std::optional<BlockColor> blocks[20][10];
 
   // current mino and ghost
   bool has_cur_mino = false;
@@ -486,7 +478,7 @@ struct RenderSnapshot {
   // hold
   bool has_hold_mino = false;
   MinoType hold_type = MinoType::T;
-  BlockRenderData hold_color{0, 0, 0};
+  BlockColor hold_color{0, 0, 0};
 
   // next minos
   std::array<MinoType, 6> next_types{};
@@ -1571,7 +1563,7 @@ class Game {
         for (int c = 0; c < 10; c++) {
           if (board.block_exists(r, c)) {
             auto& bc = board.blocks[r][c]->color;
-            snap.blocks[r][c] = BlockRenderData{bc.base, bc.lighter, bc.darker};
+            snap.blocks[r][c] = BlockColor{bc.base, bc.lighter, bc.darker};
           } else {
             snap.blocks[r][c] = std::nullopt;
           }
@@ -1594,7 +1586,7 @@ class Game {
       if (snap.has_hold_mino) {
         snap.hold_type = hold_mino->type;
         uint16_t base = hold_mino->color.base;
-        snap.hold_color = BlockRenderData{base, hold_mino->color.lighter, hold_mino->color.darker};
+        snap.hold_color = BlockColor{base, hold_mino->color.lighter, hold_mino->color.darker};
       }
 
       for (int i = 0; i < 6; i++) snap.next_types[i] = next_mino_type(i);
@@ -1685,15 +1677,6 @@ class Game {
       render_mino_on_sprite_with_offset(hold_sprite, m, x_offset, y_offset, dp.hold_mino_block_size, dp.hold_mino_bevel);
     }
 
-    //   Mino m = Mino::for_hold_box(hold_mino->type);
-    //   // in case hold mino color is overridden. This is needed because this does not directly renders hold_mino but
-    //   // it creates a new Mino instance m. This is not a good design
-    //   m.color = hold_mino->color;
-    //   int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
-    //   int y_offset = m.is_I() ? (dp.hold_mino_block_size / 2) : dp.hold_mino_block_size;
-    //   render_mino_on_hold_box(m, x_offset, y_offset);
-    // }
-
     void render_mino_data_on_sprite(TFT_eSprite& sprite, const MinoRenderData& m, int x_offset, int y_offset, int block_size, int bevel_size) {
       for (int i = 0; i < 4; i++) {
         render_block(sprite, m.positions[i].row, m.positions[i].col, x_offset, y_offset, block_size, bevel_size, m.base, m.lighter, m.darker);
@@ -1713,7 +1696,7 @@ class Game {
         Mino m = Mino::for_hold_box(snap.hold_type);
         int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
         int y_offset = m.is_I() ? (dp.hold_mino_block_size / 2) : dp.hold_mino_block_size;
-        m.color = BlockColor(snap.hold_color.base, snap.hold_color.lighter, snap.hold_color.darker);
+        m.color = BlockColor{snap.hold_color.base, snap.hold_color.lighter, snap.hold_color.darker};
         render_mino_on_hold_box(m, x_offset, y_offset);
         hold_sprite.pushSprite(dp.hold_sprite_x, dp.hold_sprite_y);
       }
