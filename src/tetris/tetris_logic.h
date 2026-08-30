@@ -27,6 +27,7 @@ enum class TSpinKind {
 class GameLogic {
   public:
     GameMode mode;
+    int starting_level{1};
 
     Board board;
     std::array<MinoType, 7> cur_bag;
@@ -45,6 +46,7 @@ class GameLogic {
     boolean lockdown_judging{false};
     int move_cnt_while_lockdown_judging{0};
     boolean hold_once_tried{false};
+    boolean in_b2b{false};
 
     // pause
     boolean paused{false};
@@ -55,11 +57,9 @@ class GameLogic {
     int mino_placed{0};
     int score{0};
     int removed_lines{0};
-    int starting_level{1};
     int tetris_count{0};
     int tspins{0};
     int combos{-1}; // combos starts count when 2 consecutive clear happens, and it is counted as "1 combo", so it's good to start with -1
-    boolean in_b2b{false};
     int hold_count{0};
     int max_combos{0};
 
@@ -76,8 +76,10 @@ class GameLogic {
     std::optional<GameResult> final_result;
 
   public:
-    GameLogic(TripleBuffer &tb, GameMode mode, Input &input, SemaphoreHandle_t logic_done_sem) :
+    GameLogic(TripleBuffer &tb, GameMode mode, int level, int garbage_lines, Input &input, SemaphoreHandle_t logic_done_sem) :
       mode(mode),
+      starting_level(level),
+      board(garbage_lines),
       cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       input(input),

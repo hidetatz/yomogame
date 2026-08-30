@@ -246,7 +246,30 @@ class Board {
   public:
     std::optional<Mino> cur_mino;
     std::optional<Block> blocks[20][10]; // block position is managed by the index in blocks, not BlockPos
-    Board() {}
+    Board(int garbage_lines) {
+      prepare_garbages(garbage_lines);
+    }
+
+    void prepare_garbages(int lines) {
+      if (lines != 0) {
+        for (int row = 20; row > 20 - lines; row--) {
+          int pool[10] = {0,1,2,3,4,5,6,7,8,9};
+          int size = 10;
+          int cols[5] = {0, 0, 0, 0, 0};
+          for (int i = 0; i < 5; ++i) {
+              int idx = rand() % size;
+              cols[i] = pool[idx];
+              pool[idx] = pool[size - 1];
+              size--;
+          }
+          for (int i = 0; i < 5; i++) {
+            int col = cols[i];
+            BlockColor color = {44404, 54969, 35920}; // gray
+            blocks[row][col] = Block{color.base, color};
+          }
+        }
+      }
+    }
 
     boolean cur_mino_exists() { return cur_mino.has_value(); }
     boolean block_exists(int row, int col) { return blocks[row][col].has_value(); }

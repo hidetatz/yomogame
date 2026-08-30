@@ -26,9 +26,9 @@ class Game {
     TaskHandle_t logic_task_handle;
     TaskHandle_t render_task_handle;
 
-    Game(GameMode mode, Input &input, TFT_eSPI &screen, DisplayParameters &params) :
+    Game(GameMode mode, int level, int garbage_lines, Input &input, TFT_eSPI &screen, DisplayParameters &params) :
       logic_done_sem(xSemaphoreCreateBinary()),
-      logic(tb, mode, input, logic_done_sem),
+      logic(tb, mode, level, garbage_lines, input, logic_done_sem),
       renderer(tb, screen, params, logic_running, mode == GameMode::Endless),
       logic_task_handle(nullptr),
       render_task_handle(nullptr)
@@ -70,6 +70,8 @@ class Game {
 class YomoTetris {
   public:
     GameMode cur_focus_mode;
+    int starting_level;
+    int garbage_lines;
     DisplayParameters dp;
     Input input;
     TFT_eSPI &screen;
@@ -78,6 +80,8 @@ class YomoTetris {
 
     YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
       cur_focus_mode(GameMode::Endless),
+      starting_level(0),
+      garbage_lines(0),
       dp(params),
       input(input),
       screen(screen),
@@ -104,6 +108,23 @@ class YomoTetris {
       sprite.drawString(str.c_str(), x + (width / 2), y + (height / 2), font);
     }
 
+    void render_tc_label(TFT_eSprite& sprite, std::string str, int x, int y, uint8_t font) {
+      uint16_t grid_color = TFT_WHITE;
+      uint16_t bg_color = TFT_BLACK;
+      uint16_t char_color = TFT_WHITE;
+      if (selected) {
+        grid_color = TFT_WHITE;
+        bg_color = TFT_WHITE;
+        char_color = TFT_BLACK;
+      }
+
+      sprite.drawRect(x, y, width, height, grid_color);
+      sprite.fillRect(x+1, y+1, width-2, height-2, bg_color);
+      sprite.setTextColor(char_color, bg_color);
+      sprite.setTextDatum(MC_DATUM);
+      sprite.drawString(str.c_str(), x + (width / 2), y + (height / 2), font);
+    }
+
     void menu() {
       ButtonState initial = input.get();
       boolean was_up = initial.UP;
@@ -114,6 +135,9 @@ class YomoTetris {
         render_menubox(menu_sprite, "40 Lines",  dp.menu_mode_x_in_sprite, dp.menu_mode_l40_y_in_sprite,     dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L40);
         render_menubox(menu_sprite, "150 Lines", dp.menu_mode_x_in_sprite, dp.menu_mode_l150_y_in_sprite,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L150);
         render_menubox(menu_sprite, "999 Lines", dp.menu_mode_x_in_sprite, dp.menu_mode_l999_y_in_sprite,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L999);
+
+        render_tc_label(menu_sprite, "Starting Level", dp.menu_level_x_center_in_sprite, dp.menu_level_y_in_sprite, 2);
+        render_tc_label(menu_sprite, "Garbage Lines", dp.menu_garbage_x_center_in_sprite, dp.menu_garbage_y_in_sprite, 2);
 
         ButtonState btns = input.get();
         if (btns.A && !was_a) return;
@@ -215,7 +239,7 @@ class YomoTetris {
       while (true) {
         screen.fillScreen(TFT_BLACK);
         menu();
-        Game* game = new Game(cur_focus_mode, input, screen, dp);
+        Game* game = new Game(cur_focus_mode, level, garbage_lines, input, screen, dp);
         GameResult result = game->start();
         delete game;
         if (result.code != GameResultCode::Cancel) {
