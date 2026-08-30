@@ -223,8 +223,17 @@ class YomoTetris {
         Game* game = new Game(cur_focus_mode, input, screen, dp);
         GameResult result = game->start();
         delete game;
-        delay(500);
-        show_result(result);
+        if (result.code != GameResultCode::Cancel) {
+          delay(500);
+          show_result(result);
+        } else {
+          // wait for A button is released
+          while (true) {
+            ButtonState btns = input.get();
+            if (!btns.A) break;
+            delay(10);
+          }
+        }
         delay(100);
       }
     }

@@ -462,6 +462,28 @@ class GameRenderer {
       }
     }
 
+    void render_pause_modal(PauseOption selected) {
+      int modal_w = 100, modal_h = 80;
+      int modal_x = (dp.board_box_x + dp.board_box_width / 2) - modal_w / 2;
+      int modal_y = (dp.board_box_y + dp.board_box_height / 2) - modal_h / 2;
+
+      screen.fillRect(modal_x, modal_y, modal_w, modal_h, TFT_BLACK);
+      screen.drawRect(modal_x, modal_y, modal_w, modal_h, TFT_WHITE);
+
+      screen.setTextColor(TFT_WHITE, TFT_BLACK);
+      screen.setTextDatum(TC_DATUM);
+      screen.drawString("PAUSE", modal_x + modal_w / 2, modal_y + 12, 2);
+
+      uint16_t resume_color = (selected == PauseOption::RESUME) ? TFT_YELLOW : TFT_WHITE;
+      uint16_t quit_color    = (selected == PauseOption::QUIT) ? TFT_YELLOW : TFT_WHITE;
+
+      screen.setTextColor(resume_color, TFT_BLACK);
+      screen.drawString("Resume", modal_x + modal_w / 2, modal_y + 40, 2);
+
+      screen.setTextColor(quit_color, TFT_BLACK);
+      screen.drawString("Quit to Menu", modal_x + modal_w / 2, modal_y + 60, 2);
+    }
+
     void render_from_snapshot(const GameSnapshot& snap) {
       // hold
       hold_sprite.fillSprite(bgcolor);
@@ -532,6 +554,8 @@ class GameRenderer {
         render_mino_on_next_minos(next_minos_sprite, m, x_offset, y_in_sprite + y_offset);
       }
       next_minos_sprite.pushSprite(dp.next_minos_sprite_x, dp.next_minos_sprite_y);
+
+      if (snap.is_paused) render_pause_modal(snap.pause_selected);
     }
 };
 

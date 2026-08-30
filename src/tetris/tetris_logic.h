@@ -46,6 +46,10 @@ class GameLogic {
     int move_cnt_while_lockdown_judging{0};
     boolean hold_once_tried{false};
 
+    // pause
+    boolean paused{false};
+    PauseOption pause_selected{PauseOption::RESUME};
+
     // stats
     unsigned long game_started_at{0};
     int mino_placed{0};
@@ -448,127 +452,148 @@ class GameLogic {
         ButtonState btns = input.get();
 
         bool failed = false;
+        bool quitted = false;
+        bool cleared = false;
 
-        // pop mino if needed
-        if (!board.cur_mino_exists()) {
-          Mino m = next_mino();
-          if (!try_place_mino(m, now)) failed = true;
+        if (btns.START && !prev_input.START) {
+          paused = !paused;
+          if (paused) pause_selected = PauseOption::RESUME;
+          else free_fall_timer = now;
         }
 
-        if (!failed) {
-          // check hard drop
-          if (btns.UP && !prev_input.UP) {
-            int i = 0;
-            while (try_move(MoveDirection::DOWN, 1, now)) i++;
-            score += 2 * i;
-            hard_dropped = true;
-          } else {
-            // hold
-            // because R button does not exist, uses SELECT press as hold
-            if (btns.SELECT) {
-              if (!hold_once_tried && board.cur_mino_exists()) {
-                hold_once_tried = true;
+        if (paused) {
+          if ((btns.UP && !prev_input.UP) || (btns.DOWN && !prev_input.DOWN))
+            pause_selected = (pause_selected == PauseOption::RESUME) ? PauseOption::QUIT : PauseOption::RESUME;
 
-                // flash animation
-                for (int i = 0; i < 3; i++) {
-                  // render flashed (white) lines
-                  board.cur_mino->flash();
-                  if (hold_mino.has_value()) hold_mino->flash();
-                  publish_snapshot();
-                  vTaskDelay(pdMS_TO_TICKS(30));
-
-                  // render original lines
-                  board.cur_mino->stop_flash();
-                  if (hold_mino.has_value()) hold_mino->stop_flash();
-                  publish_snapshot();
-                  vTaskDelay(pdMS_TO_TICKS(30));
-                }
-
-                // temporary save current hold mino
-                std::optional<Mino> temp = hold_mino;
-
-                // next hold mino is current mino
-                hold_mino = Mino::for_board(board.cur_mino->type);
-
-                // next mino is holded one if hold exists, else next_mino();
-                Mino next = temp.has_value() ? *temp : next_mino();
-
-                if (!try_place_mino(next, now)) failed = true;
-                else hold_count++;
-              }
+          if (btns.A && !prev_input.A) {
+            if (pause_selected == PauseOption::QUIT) {
+              quitted = true;
+            } else {
+              paused = false;
+              free_fall_timer = now;
             }
+          }
+        } else {
+          // pop mino if needed
+          if (!board.cur_mino_exists()) {
+            Mino m = next_mino();
+            if (!try_place_mino(m, now)) failed = true;
+          }
 
-            if (!failed) {
-              // rotation
-              if (btns.A && !prev_input.A) try_rotate(RotateDirection::CLOCKWISE, now);
-              else if (btns.B && !prev_input.B) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
+          if (!failed) {
+            // check hard drop
+            if (btns.UP && !prev_input.UP) {
+              int i = 0;
+              while (try_move(MoveDirection::DOWN, 1, now)) i++;
+              score += 2 * i;
+              hard_dropped = true;
+            } else {
+              // hold
+              // because R button does not exist, uses SELECT press as hold
+              if (btns.SELECT) {
+                if (!hold_once_tried && board.cur_mino_exists()) {
+                  hold_once_tried = true;
 
-              // softdrop
-              if (btns.DOWN) {
-                // when DOWN button press held, soft drop needs some interval
-                boolean soft_drop_interval_passed = (now - last_soft_dropped) >= free_fall_ms() / 20;
+                  // flash animation
+                  for (int i = 0; i < 3; i++) {
+                    // render flashed (white) lines
+                    board.cur_mino->flash();
+                    if (hold_mino.has_value()) hold_mino->flash();
+                    publish_snapshot();
+                    vTaskDelay(pdMS_TO_TICKS(30));
 
-                // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
-                if (!prev_input.DOWN || soft_drop_interval_passed) {
-                  if (try_move(MoveDirection::DOWN, 1, now)) score += 1;
-                  last_soft_dropped = now;
+                    // render original lines
+                    board.cur_mino->stop_flash();
+                    if (hold_mino.has_value()) hold_mino->stop_flash();
+                    publish_snapshot();
+                    vTaskDelay(pdMS_TO_TICKS(30));
+                  }
+
+                  // temporary save current hold mino
+                  std::optional<Mino> temp = hold_mino;
+
+                  // next hold mino is current mino
+                  hold_mino = Mino::for_board(board.cur_mino->type);
+
+                  // next mino is holded one if hold exists, else next_mino();
+                  Mino next = temp.has_value() ? *temp : next_mino();
+
+                  if (!try_place_mino(next, now)) failed = true;
+                  else hold_count++;
                 }
               }
 
-              apply_free_fall(now);
+              if (!failed) {
+                // rotation
+                if (btns.A && !prev_input.A) try_rotate(RotateDirection::CLOCKWISE, now);
+                else if (btns.B && !prev_input.B) try_rotate(RotateDirection::COUNTER_CLOCKWISE, now);
 
-              // horizontal move
-              if (btns.RIGHT || btns.LEFT) {
-                MoveDirection dir = btns.RIGHT ? MoveDirection::RIGHT : MoveDirection::LEFT;
+                // softdrop
+                if (btns.DOWN) {
+                  // when DOWN button press held, soft drop needs some interval
+                  boolean soft_drop_interval_passed = (now - last_soft_dropped) >= free_fall_ms() / 20;
 
-                if (btns.RIGHT && btns.LEFT) {
-                  // on both pressed, do nothing
+                  // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
+                  if (!prev_input.DOWN || soft_drop_interval_passed) {
+                    if (try_move(MoveDirection::DOWN, 1, now)) score += 1;
+                    last_soft_dropped = now;
+                  }
+                }
 
-                } else if ((btns.RIGHT && !prev_input.RIGHT) || (btns.LEFT && !prev_input.LEFT)) {
-                  // when horizontal press changed, just move
-                  try_move(dir, 1, now);
-                  horizontal_auto_repeat_started = false;
+                apply_free_fall(now);
 
-                } else {
-                  // when press held, move after some interval
-                  if (!horizontal_auto_repeat_started) {
-                    if (now - last_horizontally_moved_at >= horizontal_move_first_wait_ms) {
-                      try_move(dir, 1, now);
-                      horizontal_auto_repeat_started = true;
-                    }
+                // horizontal move
+                if (btns.RIGHT || btns.LEFT) {
+                  MoveDirection dir = btns.RIGHT ? MoveDirection::RIGHT : MoveDirection::LEFT;
+
+                  if (btns.RIGHT && btns.LEFT) {
+                    // on both pressed, do nothing
+
+                  } else if ((btns.RIGHT && !prev_input.RIGHT) || (btns.LEFT && !prev_input.LEFT)) {
+                    // when horizontal press changed, just move
+                    try_move(dir, 1, now);
+                    horizontal_auto_repeat_started = false;
+
                   } else {
-                    if (now - last_horizontally_moved_at >= horizontal_move_auto_repeating_wait_ms) {
-                      try_move(dir, 1, now);
+                    // when press held, move after some interval
+                    if (!horizontal_auto_repeat_started) {
+                      if (now - last_horizontally_moved_at >= horizontal_move_first_wait_ms) {
+                        try_move(dir, 1, now);
+                        horizontal_auto_repeat_started = true;
+                      }
+                    } else {
+                      if (now - last_horizontally_moved_at >= horizontal_move_auto_repeating_wait_ms) {
+                        try_move(dir, 1, now);
+                      }
                     }
                   }
                 }
               }
             }
           }
-        }
 
-        boolean cleared = false;
-
-        if (!failed) {
-          if (board.mino_landed()) {
-            if (!lockdown_judging) lockdown_judging = true;
-            if (hard_dropped || (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit)) {
-              if (hard_dropped) hard_dropped = false;
-              if (!lock_mino_and_clear_lines()) failed = true;
+          if (!failed) {
+            if (board.mino_landed()) {
+              if (!lockdown_judging) lockdown_judging = true;
+              if (hard_dropped || (now - last_moved_at >= lockdown_wait_ms || move_cnt_while_lockdown_judging >= lockdown_reset_move_limit)) {
+                if (hard_dropped) hard_dropped = false;
+                if (!lock_mino_and_clear_lines()) failed = true;
+              }
+            } else if (lockdown_judging) {
+              // in case once landed and judge started, but now it's not landed, reset them.
+              // this happens when once landed, but moved horizontally, then it's not landed now
+              lockdown_judging = false;
+              move_cnt_while_lockdown_judging = 0;
             }
-          } else if (lockdown_judging) {
-            // in case once landed and judge started, but now it's not landed, reset them.
-            // this happens when once landed, but moved horizontally, then it's not landed now
-            lockdown_judging = false;
-            move_cnt_while_lockdown_judging = 0;
+            cleared = (!(mode == GameMode::Endless) && current_goal() <= 0);
           }
-          cleared = (!(mode == GameMode::Endless) && current_goal() <= 0);
         }
 
         
         publish_snapshot();
         prev_input = btns;
 
+        if (quitted) { final_result = game_cancel(); break; }
         if (failed)  { final_result = game_fail();  break; }
         if (cleared) { final_result = game_clear(); break; }
 
@@ -633,6 +658,9 @@ class GameLogic {
       snap.elapsed_ms = elapsed_ms;
       snap.tpm = elapsed_ms >= 3000 ? current_tpm() : 0;
       snap.lpm = elapsed_ms >= 3000 ? current_lpm() : 0;
+
+      snap.is_paused = paused;
+      snap.pause_selected = pause_selected;
     }
 
     void publish_snapshot() {

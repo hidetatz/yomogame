@@ -37,6 +37,11 @@ struct GameSnapshot {
   double tpm{0};
   double lpm{0};
   unsigned long elapsed_ms{0};
+
+  // pause
+  bool is_paused{false};
+  PauseOption pause_selected = PauseOption::RESUME;
+
 };
 
 class TripleBuffer {

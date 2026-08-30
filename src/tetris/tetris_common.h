@@ -8,6 +8,10 @@
  
 #include <Arduino.h>
 
+enum class PauseOption {
+  RESUME, QUIT
+};
+
 struct BlockColor {
   uint16_t base;
   uint16_t lighter;
