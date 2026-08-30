@@ -151,6 +151,14 @@ struct DisplayParameters {
   const int next_minos_mino_y4_in_sprite;
   const int next_minos_mino_y5_in_sprite;
 
+  const int pause_sprite_width;
+  const int pause_sprite_height;
+  const int pause_sprite_x;
+  const int pause_sprite_y;
+  const int pause_sprite_title_y_in_sprite;
+  const int pause_sprite_resume_y_in_sprite;
+  const int pause_sprite_quit_y_in_sprite;
+
   // yomogi image
   const int yomogi_width;
   const int yomogi_height;
@@ -299,6 +307,15 @@ const DisplayParameters disp_param_240x240 {
   .next_minos_mino_y4_in_sprite = 88,
   .next_minos_mino_y5_in_sprite = 110,
 
+  // pause
+  .pause_sprite_width = 100,
+  .pause_sprite_height = 88,
+  .pause_sprite_x = 70,
+  .pause_sprite_y = 76,
+  .pause_sprite_title_y_in_sprite = 10,
+  .pause_sprite_resume_y_in_sprite = 36,
+  .pause_sprite_quit_y_in_sprite = 62,
+
   .yomogi_width = YOMOGI_240X240_WIDTH,
   .yomogi_height = YOMOGI_240X240_HEIGHT,
   .yomogi_x = 183,
@@ -317,6 +334,7 @@ class GameRenderer {
     TFT_eSprite next_minos_sprite;
     TFT_eSprite hold_sprite;
     TFT_eSprite stats_sprite;
+    TFT_eSprite pause_sprite;
     std::atomic<bool> &running;
     bool is_endless;
 
@@ -329,6 +347,7 @@ class GameRenderer {
       next_minos_sprite(&screen),
       hold_sprite(&screen),
       stats_sprite(&screen),
+      pause_sprite(&screen),
       running(running),
       is_endless(is_endless)
       {}
@@ -366,6 +385,8 @@ class GameRenderer {
       next_minos_sprite.createSprite(dp.next_minos_sprite_width, dp.next_minos_sprite_height);
       render_square(dp.next_minos_box_x, dp.next_minos_box_y, dp.next_minos_box_width, dp.next_minos_box_height);
       render_centered_label("Next", dp.next_minos_label_x_center, dp.next_minos_label_y, dp.next_minos_label_font);
+
+      pause_sprite.createSprite(dp.pause_sprite_width, dp.pause_sprite_height);
 
       /* yomogi area */
       screen.setSwapBytes(true);
@@ -463,99 +484,99 @@ class GameRenderer {
     }
 
     void render_pause_modal(PauseOption selected) {
-      int modal_w = 100, modal_h = 80;
-      int modal_x = (dp.board_box_x + dp.board_box_width / 2) - modal_w / 2;
-      int modal_y = (dp.board_box_y + dp.board_box_height / 2) - modal_h / 2;
+      pause_sprite.fillRect(0, 0, dp.pause_sprite_width, dp.pause_sprite_height, TFT_BLACK);
+      pause_sprite.drawRect(0, 0, dp.pause_sprite_width, dp.pause_sprite_height, TFT_WHITE);
 
-      screen.fillRect(modal_x, modal_y, modal_w, modal_h, TFT_BLACK);
-      screen.drawRect(modal_x, modal_y, modal_w, modal_h, TFT_WHITE);
-
-      screen.setTextColor(TFT_WHITE, TFT_BLACK);
-      screen.setTextDatum(TC_DATUM);
-      screen.drawString("PAUSE", modal_x + modal_w / 2, modal_y + 12, 2);
+      pause_sprite.setTextColor(TFT_WHITE, TFT_BLACK);
+      pause_sprite.setTextDatum(TC_DATUM);
+      pause_sprite.drawString("PAUSE", dp.pause_sprite_width / 2, dp.pause_sprite_title_y_in_sprite, 2);
 
       uint16_t resume_color = (selected == PauseOption::RESUME) ? TFT_YELLOW : TFT_WHITE;
       uint16_t quit_color    = (selected == PauseOption::QUIT) ? TFT_YELLOW : TFT_WHITE;
 
-      screen.setTextColor(resume_color, TFT_BLACK);
-      screen.drawString("Resume", modal_x + modal_w / 2, modal_y + 40, 2);
+      pause_sprite.setTextColor(resume_color, TFT_BLACK);
+      pause_sprite.drawString("Resume", dp.pause_sprite_width / 2, dp.pause_sprite_resume_y_in_sprite, 2);
 
-      screen.setTextColor(quit_color, TFT_BLACK);
-      screen.drawString("Quit to Menu", modal_x + modal_w / 2, modal_y + 60, 2);
+      pause_sprite.setTextColor(quit_color, TFT_BLACK);
+      pause_sprite.drawString("Quit to Menu", dp.pause_sprite_width / 2, dp.pause_sprite_quit_y_in_sprite, 2);
+
+      pause_sprite.pushSprite(dp.pause_sprite_x, dp.pause_sprite_y);
     }
 
     void render_from_snapshot(const GameSnapshot& snap) {
-      // hold
-      hold_sprite.fillSprite(bgcolor);
-      if (snap.has_hold_mino) {
-        Mino m = Mino::for_hold_box(snap.hold_type);
-        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
-        int y_offset = m.is_I() ? (dp.hold_mino_block_size / 2) : dp.hold_mino_block_size;
-        m.color = BlockColor{snap.hold_color.base, snap.hold_color.lighter, snap.hold_color.darker};
-        render_mino_on_hold_box(m, x_offset, y_offset);
-        hold_sprite.pushSprite(dp.hold_sprite_x, dp.hold_sprite_y);
-      }
+      if (snap.is_paused) {
+        render_pause_modal(snap.pause_selected);
+      } else {
+        // hold
+        hold_sprite.fillSprite(bgcolor);
+        if (snap.has_hold_mino) {
+          Mino m = Mino::for_hold_box(snap.hold_type);
+          int x_offset = m.is_I() ? 0 : m.is_O() ? dp.hold_mino_block_size : dp.hold_mino_block_size / 2;
+          int y_offset = m.is_I() ? (dp.hold_mino_block_size / 2) : dp.hold_mino_block_size;
+          m.color = BlockColor{snap.hold_color.base, snap.hold_color.lighter, snap.hold_color.darker};
+          render_mino_on_hold_box(m, x_offset, y_offset);
+          hold_sprite.pushSprite(dp.hold_sprite_x, dp.hold_sprite_y);
+        }
 
-      // score
-      render_right_label(std::to_string(snap.score), dp.score_time_x_right, dp.score_y, dp.stats_font);
+        // score
+        render_right_label(std::to_string(snap.score), dp.score_time_x_right, dp.score_y, dp.stats_font);
 
-      /* time */
-      int minutes = snap.elapsed_ms / (1000 * 60);
-      int seconds = (snap.elapsed_ms / 1000) % 60;
-      int centis  = (snap.elapsed_ms % 1000) / 10;
-      char time_str[9];
-      snprintf(time_str, sizeof(time_str), "%02d:%02d:%02d", minutes, seconds, centis);
-      render_right_label(time_str, dp.score_time_x_right, dp.time_y, dp.stats_font);
+        /* time */
+        int minutes = snap.elapsed_ms / (1000 * 60);
+        int seconds = (snap.elapsed_ms / 1000) % 60;
+        int centis  = (snap.elapsed_ms % 1000) / 10;
+        char time_str[9];
+        snprintf(time_str, sizeof(time_str), "%02d:%02d:%02d", minutes, seconds, centis);
+        render_right_label(time_str, dp.score_time_x_right, dp.time_y, dp.stats_font);
 
-      /* stats */
-      stats_sprite.fillRect(0, 0, dp.stats_sprite_width, dp.stats_sprite_height, bgcolor);
-      char tpm_str[6], lpm_str[6];
-      snprintf(tpm_str, sizeof(tpm_str), "%.1f", snap.tpm);
-      snprintf(lpm_str, sizeof(lpm_str), "%.1f", snap.lpm);
+        /* stats */
+        stats_sprite.fillRect(0, 0, dp.stats_sprite_width, dp.stats_sprite_height, bgcolor);
+        char tpm_str[6], lpm_str[6];
+        snprintf(tpm_str, sizeof(tpm_str), "%.1f", snap.tpm);
+        snprintf(lpm_str, sizeof(lpm_str), "%.1f", snap.lpm);
 
-      render_right_label_sprite(stats_sprite, std::to_string(snap.top_stat),                     dp.stats_x_right_in_sprite, dp.lines_or_goal_y_in_sprite, dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(snap.level),                         dp.stats_x_right_in_sprite, dp.level_y_in_sprite,         dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(snap.tetris_count),                  dp.stats_x_right_in_sprite, dp.tetris_y_in_sprite,        dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(snap.tspins),                        dp.stats_x_right_in_sprite, dp.tspin_y_in_sprite,         dp.stats_font);
-      render_right_label_sprite(stats_sprite, std::to_string(snap.combos < 0 ? 0 : snap.combos),  dp.stats_x_right_in_sprite, dp.combo_y_in_sprite,         dp.stats_font);
-      render_right_label_sprite(stats_sprite, tpm_str,                                            dp.stats_x_right_in_sprite, dp.tpm_y_in_sprite,           dp.stats_font);
-      render_right_label_sprite(stats_sprite, lpm_str,                                            dp.stats_x_right_in_sprite, dp.lpm_y_in_sprite,           dp.stats_font);
-      stats_sprite.pushSprite(dp.stats_sprite_x, dp.stats_sprite_y);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.top_stat),                     dp.stats_x_right_in_sprite, dp.lines_or_goal_y_in_sprite, dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.level),                         dp.stats_x_right_in_sprite, dp.level_y_in_sprite,         dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.tetris_count),                  dp.stats_x_right_in_sprite, dp.tetris_y_in_sprite,        dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.tspins),                        dp.stats_x_right_in_sprite, dp.tspin_y_in_sprite,         dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.combos < 0 ? 0 : snap.combos),  dp.stats_x_right_in_sprite, dp.combo_y_in_sprite,         dp.stats_font);
+        render_right_label_sprite(stats_sprite, tpm_str,                                            dp.stats_x_right_in_sprite, dp.tpm_y_in_sprite,           dp.stats_font);
+        render_right_label_sprite(stats_sprite, lpm_str,                                            dp.stats_x_right_in_sprite, dp.lpm_y_in_sprite,           dp.stats_font);
+        stats_sprite.pushSprite(dp.stats_sprite_x, dp.stats_sprite_y);
 
-      /* board */
-      board_sprite.fillSprite(bgcolor);
-      for (int row = 0; row < 20; row++) {
-        for (int col = 0; col < 10; col++) {
-          if (!snap.blocks[row][col].has_value()) {
-            render_empty_block(board_sprite, row, col, dp.board_mino_block_size);
-          } else {
-            auto& c = *snap.blocks[row][col];
-            render_block(board_sprite, row, col, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel, c.base, c.lighter, c.darker);
+        /* board */
+        board_sprite.fillSprite(bgcolor);
+        for (int row = 0; row < 20; row++) {
+          for (int col = 0; col < 10; col++) {
+            if (!snap.blocks[row][col].has_value()) {
+              render_empty_block(board_sprite, row, col, dp.board_mino_block_size);
+            } else {
+              auto& c = *snap.blocks[row][col];
+              render_block(board_sprite, row, col, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel, c.base, c.lighter, c.darker);
+            }
           }
         }
-      }
-      if (snap.has_cur_mino) {
-        render_ghost_from_data(snap.cur_mino_block_pos, snap.cur_mino_color.base, snap.hard_drop_distance);
-        render_mino_data_on_sprite(board_sprite, snap.cur_mino_block_pos, snap.cur_mino_color, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel);
-      }
-      board_sprite.pushSprite(dp.board_sprite_x, dp.board_sprite_y);
+        if (snap.has_cur_mino) {
+          render_ghost_from_data(snap.cur_mino_block_pos, snap.cur_mino_color.base, snap.hard_drop_distance);
+          render_mino_data_on_sprite(board_sprite, snap.cur_mino_block_pos, snap.cur_mino_color, 0, 0, dp.board_mino_block_size, dp.board_mino_bevel);
+        }
+        board_sprite.pushSprite(dp.board_sprite_x, dp.board_sprite_y);
 
-      next_minos_sprite.fillSprite(bgcolor);
-      for (int i = 0; i < 6; i++) {
-        Mino m = Mino::for_next_minos(snap.next_types[i]);
-        int x_offset = m.is_I() ? 0 : m.is_O() ? dp.next_minos_mino_block_size : dp.next_minos_mino_block_size / 2;
-        int y_offset = m.is_I() ? (dp.next_minos_mino_block_size / 2) : dp.next_minos_mino_block_size;
-        int y_in_sprite =
-          i == 0 ? dp.next_minos_mino_y0_in_sprite :
-          i == 1 ? dp.next_minos_mino_y1_in_sprite :
-          i == 2 ? dp.next_minos_mino_y2_in_sprite :
-          i == 3 ? dp.next_minos_mino_y3_in_sprite :
-          i == 4 ? dp.next_minos_mino_y4_in_sprite : dp.next_minos_mino_y5_in_sprite;
-        render_mino_on_next_minos(next_minos_sprite, m, x_offset, y_in_sprite + y_offset);
+        next_minos_sprite.fillSprite(bgcolor);
+        for (int i = 0; i < 6; i++) {
+          Mino m = Mino::for_next_minos(snap.next_types[i]);
+          int x_offset = m.is_I() ? 0 : m.is_O() ? dp.next_minos_mino_block_size : dp.next_minos_mino_block_size / 2;
+          int y_offset = m.is_I() ? (dp.next_minos_mino_block_size / 2) : dp.next_minos_mino_block_size;
+          int y_in_sprite =
+            i == 0 ? dp.next_minos_mino_y0_in_sprite :
+            i == 1 ? dp.next_minos_mino_y1_in_sprite :
+            i == 2 ? dp.next_minos_mino_y2_in_sprite :
+            i == 3 ? dp.next_minos_mino_y3_in_sprite :
+            i == 4 ? dp.next_minos_mino_y4_in_sprite : dp.next_minos_mino_y5_in_sprite;
+          render_mino_on_next_minos(next_minos_sprite, m, x_offset, y_in_sprite + y_offset);
+        }
+        next_minos_sprite.pushSprite(dp.next_minos_sprite_x, dp.next_minos_sprite_y);
       }
-      next_minos_sprite.pushSprite(dp.next_minos_sprite_x, dp.next_minos_sprite_y);
-
-      if (snap.is_paused) render_pause_modal(snap.pause_selected);
     }
 };
 
