@@ -1167,6 +1167,45 @@ class Game {
       );
     }
 
+    int free_fall_ms() {
+      int cur_level = current_level();
+
+      if (cur_level == 1) return 1000;
+      if (cur_level == 2) return 806;
+      if (cur_level == 3) return 651;
+      if (cur_level == 4) return 524;
+      if (cur_level == 5) return 423;
+      if (cur_level == 6) return 341;
+      if (cur_level == 7) return 275;
+      if (cur_level == 8) return 221;
+      if (cur_level == 9) return 178;
+      if (cur_level == 10) return 144;
+      if (cur_level == 11) return 116;
+      if (cur_level == 12) return 93;
+      if (cur_level == 13) return 75;
+      if (cur_level == 14) return 60;
+      if (cur_level == 15) return 49;
+      if (cur_level == 16) return 39;
+      if (cur_level == 17) return 31;
+      if (cur_level == 18) return 25;
+      if (cur_level == 19) return 20;
+      if (cur_level == 20) return 16;
+      if (cur_level == 21) return 13;
+      if (cur_level == 22) return 10;
+      if (cur_level == 23) return 8;
+      if (cur_level == 24) return 7;
+      if (cur_level == 25) return 5;
+      if (cur_level == 26) return 4;
+      if (cur_level == 27) return 3;
+      if (cur_level == 28) return 2;
+      if (cur_level == 29) return 2;
+      if (cur_level == 30) return 1;
+      if (cur_level == 31) return 1;
+      if (cur_level == 32) return 1;
+      if (cur_level == 33) return 1;
+      return 0;
+    }
+
     GameResult start() {
       screen.fillScreen(bgcolor);
 
@@ -1204,8 +1243,6 @@ class Game {
       /* yomogi area */
       screen.setSwapBytes(true);
       screen.pushImage(dp.yomogi_x, dp.yomogi_y, dp.yomogi_width, dp.yomogi_height, dp.yomogi_image, dp.yomogi_transparent_color);
-
-      const int FREE_FALL_MS = 1000;
 
       unsigned long last_soft_dropped = 0;
       boolean horizontal_auto_repeat_started = false;
@@ -1279,7 +1316,7 @@ class Game {
           // softdrop
           if (btns.DOWN) {
             // when DOWN button press held, soft drop needs some interval
-            boolean soft_drop_interval_passed = (now - last_soft_dropped) >= FREE_FALL_MS / 20;
+            boolean soft_drop_interval_passed = (now - last_soft_dropped) >= free_fall_ms() / 20;
 
             // when the previous press was not DOWN, or soft drop interval has passed, soft drop happens
             if (!prev_input.DOWN || soft_drop_interval_passed) {
@@ -1289,7 +1326,7 @@ class Game {
           }
 
           // free fall
-          if (now - free_fall_timer >= FREE_FALL_MS) {
+          if (now - free_fall_timer >= free_fall_ms()) {
             try_move(MoveDirection::DOWN, 1, now);
           }
 
