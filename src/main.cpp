@@ -4,7 +4,7 @@
 #include <driver/i2s.h>
 #include <esp_system.h>
 
-#include "tetris.h"
+#include "tetris/yomotetris.h"
 
 // 1:ok   2:LED  3:JTAG_EN  4:ok  5:ok     6:ok     7:ok     8:ok     9:ok  10:ok
 // 11:ok 12:ok  13:ok      14:ok 15:uart? 16:uart? 17:uart? 18:uart? 19:usb 20:usbpio pkg list
