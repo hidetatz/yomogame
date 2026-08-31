@@ -32,8 +32,7 @@ struct GameSnapshot {
   int tetris_count{0};
   int tspins{0};
   int combos{-1};
-  int top_stat{0};
-  bool is_endless{true};
+  int goal{0};
   double tpm{0};
   double lpm{0};
   unsigned long elapsed_ms{0};

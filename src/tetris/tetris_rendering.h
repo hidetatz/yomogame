@@ -19,13 +19,34 @@ struct DisplayParameters {
   const int menu_sprite_y;
   const int menu_sprite_width;
   const int menu_sprite_height;
-  const int menu_mode_width;
-  const int menu_mode_height;
-  const int menu_mode_x_in_sprite;
-  const int menu_mode_endless_y_in_sprite;
-  const int menu_mode_l40_y_in_sprite;
-  const int menu_mode_l150_y_in_sprite;
-  const int menu_mode_l999_y_in_sprite;
+  const int menu_title_x_center_in_sprite;
+  const int menu_title_y_in_sprite;
+  const int menu_mode_label_x_in_sprite;
+  const int menu_mode_label_y_in_sprite;
+  const int menu_mode_l99999_x_in_sprite;
+  const int menu_mode_l150_x_in_sprite;
+  const int menu_mode_l40_x_in_sprite;
+  const int menu_mode_value_y_in_sprite;
+  const int menu_mode_value_width;
+  const int menu_mode_value_height;
+  const int menu_level_label_x_in_sprite;
+  const int menu_level_label_y_in_sprite;
+  const int menu_level_1_x_in_sprite;
+  const int menu_level_10_x_in_sprite;
+  const int menu_level_20_x_in_sprite;
+  const int menu_level_value_y_in_sprite;
+  const int menu_level_value_width;
+  const int menu_level_value_height;
+  const int menu_garbage_label_x_in_sprite;
+  const int menu_garbage_label_y_in_sprite;
+  const int menu_garbage_0_x_in_sprite;
+  const int menu_garbage_6_x_in_sprite;
+  const int menu_garbage_12_x_in_sprite;
+  const int menu_garbage_value_y_in_sprite;
+  const int menu_garbage_value_width;
+  const int menu_garbage_value_height;
+  const int menu_msg_x_center_in_sprite;
+  const int menu_msg_y_in_sprite;
 
   const int result_sprite_x;
   const int result_sprite_y;
@@ -80,7 +101,7 @@ struct DisplayParameters {
   // stats
 
   // stats labels
-  const int lines_or_goal_label_y;
+  const int goal_label_y;
   const int level_label_y;
   const int tetris_label_y;
   const int tspin_label_y;
@@ -88,7 +109,6 @@ struct DisplayParameters {
   const int tpm_label_y;
   const int lpm_label_y;
 
-  const std::string lines_label;
   const std::string goal_label;
   const std::string level_label;
   const std::string tetris_label;
@@ -104,7 +124,7 @@ struct DisplayParameters {
   const int stats_sprite_x;
   const int stats_sprite_y;
 
-  const int lines_or_goal_y_in_sprite;
+  const int goal_y_in_sprite;
   const int level_y_in_sprite;
   const int tetris_y_in_sprite;
   const int tspin_y_in_sprite;
@@ -174,13 +194,38 @@ const DisplayParameters disp_param_240x240 {
   .menu_sprite_y = 0,
   .menu_sprite_width = 240,
   .menu_sprite_height = 240,
-  .menu_mode_width = 180,
-  .menu_mode_height = 20,
-  .menu_mode_x_in_sprite = 30,
-  .menu_mode_endless_y_in_sprite = 20,
-  .menu_mode_l40_y_in_sprite = 60,
-  .menu_mode_l150_y_in_sprite = 100,
-  .menu_mode_l999_y_in_sprite = 140,
+
+  .menu_title_x_center_in_sprite = 120,
+  .menu_title_y_in_sprite = 13,
+
+  .menu_mode_label_x_in_sprite = 15,
+  .menu_mode_label_y_in_sprite = 42,
+  .menu_mode_l99999_x_in_sprite = 15,
+  .menu_mode_l150_x_in_sprite = 88,
+  .menu_mode_l40_x_in_sprite = 161,
+  .menu_mode_value_y_in_sprite = 62,
+  .menu_mode_value_width = 64,
+  .menu_mode_value_height = 23,
+
+  .menu_level_label_x_in_sprite = 15,
+  .menu_level_label_y_in_sprite = 96,
+  .menu_level_1_x_in_sprite = 15,
+  .menu_level_10_x_in_sprite = 88,
+  .menu_level_20_x_in_sprite = 161,
+  .menu_level_value_y_in_sprite = 116,
+  .menu_level_value_width = 64,
+  .menu_level_value_height = 23,
+
+  .menu_garbage_label_x_in_sprite = 15,
+  .menu_garbage_label_y_in_sprite = 152,
+  .menu_garbage_0_x_in_sprite = 15,
+  .menu_garbage_6_x_in_sprite = 88,
+  .menu_garbage_12_x_in_sprite = 161,
+  .menu_garbage_value_y_in_sprite = 172,
+  .menu_garbage_value_width = 64,
+  .menu_garbage_value_height = 23,
+  .menu_msg_x_center_in_sprite = 120,
+  .menu_msg_y_in_sprite = 212,
 
   .result_sprite_x = 45,
   .result_sprite_y = 35,
@@ -236,7 +281,7 @@ const DisplayParameters disp_param_240x240 {
 
   // stats labels
 
-  .lines_or_goal_label_y = 132,
+  .goal_label_y = 132,
   .level_label_y = 145,
   .tetris_label_y = 158,
   .tspin_label_y = 171,
@@ -244,7 +289,6 @@ const DisplayParameters disp_param_240x240 {
   .tpm_label_y = 197,
   .lpm_label_y = 210,
 
-  .lines_label = "LNS",
   .goal_label = "GOL",
   .level_label = "LVL",
   .tetris_label = "TET",
@@ -260,7 +304,7 @@ const DisplayParameters disp_param_240x240 {
   .stats_sprite_x = 27,
   .stats_sprite_y = 132,
 
-  .lines_or_goal_y_in_sprite = 0,
+  .goal_y_in_sprite = 0,
   .level_y_in_sprite = 13,
   .tetris_y_in_sprite = 26,
   .tspin_y_in_sprite = 39,
@@ -336,9 +380,8 @@ class GameRenderer {
     TFT_eSprite stats_sprite;
     TFT_eSprite pause_sprite;
     std::atomic<bool> &running;
-    bool is_endless;
 
-    GameRenderer(TripleBuffer &tb, TFT_eSPI &screen, DisplayParameters &dp, std::atomic<bool> &running, bool is_endless) :
+    GameRenderer(TripleBuffer &tb, TFT_eSPI &screen, DisplayParameters &dp, std::atomic<bool> &running) :
       tb(tb),
       dp(dp),
       bgcolor(TFT_BLACK),
@@ -348,8 +391,7 @@ class GameRenderer {
       hold_sprite(&screen),
       stats_sprite(&screen),
       pause_sprite(&screen),
-      running(running),
-      is_endless(is_endless)
+      running(running)
       {}
 
     void setup_screen() {
@@ -368,14 +410,13 @@ class GameRenderer {
 
       /* stats labels area */
       stats_sprite.createSprite(dp.stats_sprite_width, dp.stats_sprite_height);
-      std::string lbl = is_endless ? dp.lines_label : dp.goal_label;
-      render_left_label(lbl,             dp.stats_label_x, dp.lines_or_goal_label_y, dp.stats_font);
-      render_left_label(dp.level_label,  dp.stats_label_x, dp.level_label_y,         dp.stats_font);
-      render_left_label(dp.tetris_label, dp.stats_label_x, dp.tetris_label_y,        dp.stats_font);
-      render_left_label(dp.tspin_label, dp.stats_label_x, dp.tspin_label_y,         dp.stats_font);
-      render_left_label(dp.combo_label, dp.stats_label_x, dp.combo_label_y,         dp.stats_font);
-      render_left_label(dp.tpm_label,    dp.stats_label_x, dp.tpm_label_y,           dp.stats_font);
-      render_left_label(dp.lpm_label,    dp.stats_label_x, dp.lpm_label_y,           dp.stats_font);
+      render_left_label(dp.goal_label,   dp.stats_label_x, dp.goal_label_y,   dp.stats_font);
+      render_left_label(dp.level_label,  dp.stats_label_x, dp.level_label_y,  dp.stats_font);
+      render_left_label(dp.tetris_label, dp.stats_label_x, dp.tetris_label_y, dp.stats_font);
+      render_left_label(dp.tspin_label,  dp.stats_label_x, dp.tspin_label_y,  dp.stats_font);
+      render_left_label(dp.combo_label,  dp.stats_label_x, dp.combo_label_y,  dp.stats_font);
+      render_left_label(dp.tpm_label,    dp.stats_label_x, dp.tpm_label_y,    dp.stats_font);
+      render_left_label(dp.lpm_label,    dp.stats_label_x, dp.lpm_label_y,    dp.stats_font);
 
       /* board area */
       board_sprite.createSprite(dp.board_sprite_width, dp.board_sprite_height);
@@ -535,13 +576,13 @@ class GameRenderer {
         snprintf(tpm_str, sizeof(tpm_str), "%.1f", snap.tpm);
         snprintf(lpm_str, sizeof(lpm_str), "%.1f", snap.lpm);
 
-        render_right_label_sprite(stats_sprite, std::to_string(snap.top_stat),                     dp.stats_x_right_in_sprite, dp.lines_or_goal_y_in_sprite, dp.stats_font);
-        render_right_label_sprite(stats_sprite, std::to_string(snap.level),                         dp.stats_x_right_in_sprite, dp.level_y_in_sprite,         dp.stats_font);
-        render_right_label_sprite(stats_sprite, std::to_string(snap.tetris_count),                  dp.stats_x_right_in_sprite, dp.tetris_y_in_sprite,        dp.stats_font);
-        render_right_label_sprite(stats_sprite, std::to_string(snap.tspins),                        dp.stats_x_right_in_sprite, dp.tspin_y_in_sprite,         dp.stats_font);
-        render_right_label_sprite(stats_sprite, std::to_string(snap.combos < 0 ? 0 : snap.combos),  dp.stats_x_right_in_sprite, dp.combo_y_in_sprite,         dp.stats_font);
-        render_right_label_sprite(stats_sprite, tpm_str,                                            dp.stats_x_right_in_sprite, dp.tpm_y_in_sprite,           dp.stats_font);
-        render_right_label_sprite(stats_sprite, lpm_str,                                            dp.stats_x_right_in_sprite, dp.lpm_y_in_sprite,           dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.goal),                          dp.stats_x_right_in_sprite, dp.goal_y_in_sprite,   dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.level),                         dp.stats_x_right_in_sprite, dp.level_y_in_sprite,  dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.tetris_count),                  dp.stats_x_right_in_sprite, dp.tetris_y_in_sprite, dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.tspins),                        dp.stats_x_right_in_sprite, dp.tspin_y_in_sprite,  dp.stats_font);
+        render_right_label_sprite(stats_sprite, std::to_string(snap.combos < 0 ? 0 : snap.combos),  dp.stats_x_right_in_sprite, dp.combo_y_in_sprite,  dp.stats_font);
+        render_right_label_sprite(stats_sprite, tpm_str,                                            dp.stats_x_right_in_sprite, dp.tpm_y_in_sprite,    dp.stats_font);
+        render_right_label_sprite(stats_sprite, lpm_str,                                            dp.stats_x_right_in_sprite, dp.lpm_y_in_sprite,    dp.stats_font);
         stats_sprite.pushSprite(dp.stats_sprite_x, dp.stats_sprite_y);
 
         /* board */

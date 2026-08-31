@@ -29,7 +29,7 @@ class Game {
     Game(GameMode mode, int level, int garbage_lines, Input &input, TFT_eSPI &screen, DisplayParameters &params) :
       logic_done_sem(xSemaphoreCreateBinary()),
       logic(tb, mode, level, garbage_lines, input, logic_done_sem),
-      renderer(tb, screen, params, logic_running, mode == GameMode::Endless),
+      renderer(tb, screen, params, logic_running),
       logic_task_handle(nullptr),
       render_task_handle(nullptr)
       {}
@@ -67,11 +67,16 @@ class Game {
     }
 };
 
+enum class MenuFocusedItem {
+  MODE, STARTING_LEVEL, GARBAGE_LINES
+};
+
 class YomoTetris {
   public:
-    GameMode cur_focus_mode;
-    int starting_level;
-    int garbage_lines;
+    GameMode selected_mode{GameMode::L99999};
+    int selected_starting_level{1};
+    int selected_garbage_lines{0};
+    MenuFocusedItem focused_item{MenuFocusedItem::MODE};
     DisplayParameters dp;
     Input input;
     TFT_eSPI &screen;
@@ -79,9 +84,6 @@ class YomoTetris {
     TFT_eSprite result_sprite;
 
     YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
-      cur_focus_mode(GameMode::Endless),
-      starting_level(0),
-      garbage_lines(0),
       dp(params),
       input(input),
       screen(screen),
@@ -91,14 +93,24 @@ class YomoTetris {
         result_sprite.createSprite(dp.result_sprite_width, dp.result_sprite_height);
       }
 
-    void render_menubox(TFT_eSprite& sprite, std::string str, int x, int y, int width, int height, uint8_t font, boolean selected) {
-      uint16_t grid_color = TFT_WHITE;
+    void render_menubox(TFT_eSprite& sprite, std::string str, int x, int y, int width, int height, uint8_t font, boolean focused, boolean selected) {
+      // neither focused nor selected
+      uint16_t grid_color = TFT_DARKGREY;
       uint16_t bg_color = TFT_BLACK;
-      uint16_t char_color = TFT_WHITE;
-      if (selected) {
+      uint16_t char_color = TFT_DARKGREY;
+
+      if (focused && selected) {
         grid_color = TFT_WHITE;
-        bg_color = TFT_WHITE;
+        bg_color = TFT_ORANGE;
         char_color = TFT_BLACK;
+      } else if (focused) {
+        grid_color = TFT_WHITE;
+        bg_color = TFT_BLACK;
+        char_color = TFT_WHITE;
+      } else if (selected) {
+        grid_color = TFT_DARKGREY;
+        bg_color = TFT_DARKGREY;
+        char_color = TFT_WHITE;
       }
 
       sprite.drawRect(x, y, width, height, grid_color);
@@ -108,55 +120,91 @@ class YomoTetris {
       sprite.drawString(str.c_str(), x + (width / 2), y + (height / 2), font);
     }
 
-    void render_tc_label(TFT_eSprite& sprite, std::string str, int x, int y, uint8_t font) {
-      uint16_t grid_color = TFT_WHITE;
-      uint16_t bg_color = TFT_BLACK;
-      uint16_t char_color = TFT_WHITE;
-      if (selected) {
-        grid_color = TFT_WHITE;
-        bg_color = TFT_WHITE;
-        char_color = TFT_BLACK;
-      }
+    void render_menu_label(TFT_eSprite& sprite, std::string str, int x, int y, uint8_t font, boolean focused) {
+      uint16_t char_color = focused ? TFT_ORANGE : TFT_DARKGREY;
+      std::string s = focused ? "> " + str : str;
+      sprite.setTextColor(char_color, TFT_BLACK);
+      sprite.setTextDatum(TL_DATUM);
+      sprite.drawString(str.c_str(), x, y, font);
+    }
 
-      sprite.drawRect(x, y, width, height, grid_color);
-      sprite.fillRect(x+1, y+1, width-2, height-2, bg_color);
-      sprite.setTextColor(char_color, bg_color);
-      sprite.setTextDatum(MC_DATUM);
-      sprite.drawString(str.c_str(), x + (width / 2), y + (height / 2), font);
+    void render_menu_title(TFT_eSprite& sprite, int x, int y, uint8_t font) {
+      sprite.setTextColor(TFT_CYAN, TFT_BLACK);
+      sprite.setTextDatum(TC_DATUM);
+      sprite.drawString("YomoTetris", x, y, font);
+    }
+
+    void render_menu_msg(TFT_eSprite& sprite, int x, int y, uint8_t font) {
+      sprite.setTextColor(TFT_GREEN, TFT_BLACK);
+      sprite.setTextDatum(TC_DATUM);
+      sprite.drawString("PRESS A TO START", x, y, font);
     }
 
     void menu() {
-      ButtonState initial = input.get();
-      boolean was_up = initial.UP;
-      boolean was_down = initial.DOWN;
-      boolean was_a = initial.A;
-      while (true) {
-        render_menubox(menu_sprite, "Endless",   dp.menu_mode_x_in_sprite, dp.menu_mode_endless_y_in_sprite, dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::Endless);
-        render_menubox(menu_sprite, "40 Lines",  dp.menu_mode_x_in_sprite, dp.menu_mode_l40_y_in_sprite,     dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L40);
-        render_menubox(menu_sprite, "150 Lines", dp.menu_mode_x_in_sprite, dp.menu_mode_l150_y_in_sprite,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L150);
-        render_menubox(menu_sprite, "999 Lines", dp.menu_mode_x_in_sprite, dp.menu_mode_l999_y_in_sprite,    dp.menu_mode_width, dp.menu_mode_height, 2, cur_focus_mode == GameMode::L999);
+      render_menu_title(menu_sprite, dp.menu_title_x_center_in_sprite, dp.menu_title_y_in_sprite, 2);
+      render_menu_msg(menu_sprite, dp.menu_msg_x_center_in_sprite, dp.menu_msg_y_in_sprite, 2);
 
-        render_tc_label(menu_sprite, "Starting Level", dp.menu_level_x_center_in_sprite, dp.menu_level_y_in_sprite, 2);
-        render_tc_label(menu_sprite, "Garbage Lines", dp.menu_garbage_x_center_in_sprite, dp.menu_garbage_y_in_sprite, 2);
+      ButtonState prev_state = input.get();
+
+      MenuFocusedItem focused_item = MenuFocusedItem::MODE;
+
+      while (true) {
+        render_menu_label(menu_sprite, "Mode", dp.menu_mode_label_x_in_sprite, dp.menu_mode_label_y_in_sprite, 2, focused_item == MenuFocusedItem::MODE);
+
+        render_menubox(menu_sprite, "99999", dp.menu_mode_l99999_x_in_sprite,    dp.menu_mode_value_y_in_sprite, dp.menu_mode_value_width, dp.menu_mode_value_height, 2, focused_item == MenuFocusedItem::MODE, selected_mode == GameMode::L99999);
+        render_menubox(menu_sprite, "150", dp.menu_mode_l150_x_in_sprite,    dp.menu_mode_value_y_in_sprite, dp.menu_mode_value_width, dp.menu_mode_value_height, 2, focused_item == MenuFocusedItem::MODE, selected_mode == GameMode::L150);
+        render_menubox(menu_sprite, "40",  dp.menu_mode_l40_x_in_sprite,     dp.menu_mode_value_y_in_sprite, dp.menu_mode_value_width, dp.menu_mode_value_height, 2, focused_item == MenuFocusedItem::MODE, selected_mode == GameMode::L40);
+
+        render_menu_label(menu_sprite, "Starting Level", dp.menu_level_label_x_in_sprite,   dp.menu_level_label_y_in_sprite, 2,   focused_item == MenuFocusedItem::STARTING_LEVEL);
+        render_menubox(menu_sprite, "1",  dp.menu_level_1_x_in_sprite,  dp.menu_level_value_y_in_sprite, dp.menu_level_value_width, dp.menu_level_value_height, 2, focused_item == MenuFocusedItem::STARTING_LEVEL, selected_starting_level == 1);
+        render_menubox(menu_sprite, "10", dp.menu_level_10_x_in_sprite, dp.menu_level_value_y_in_sprite, dp.menu_level_value_width, dp.menu_level_value_height, 2, focused_item == MenuFocusedItem::STARTING_LEVEL, selected_starting_level == 10);
+        render_menubox(menu_sprite, "20", dp.menu_level_20_x_in_sprite, dp.menu_level_value_y_in_sprite, dp.menu_level_value_width, dp.menu_level_value_height, 2, focused_item == MenuFocusedItem::STARTING_LEVEL, selected_starting_level == 20);
+
+        render_menu_label(menu_sprite, "Garbage Lines",  dp.menu_garbage_label_x_in_sprite, dp.menu_garbage_label_y_in_sprite, 2, focused_item == MenuFocusedItem::GARBAGE_LINES);
+        render_menubox(menu_sprite, "0",  dp.menu_garbage_0_x_in_sprite,  dp.menu_garbage_value_y_in_sprite, dp.menu_garbage_value_width, dp.menu_garbage_value_height, 2, focused_item == MenuFocusedItem::GARBAGE_LINES, selected_garbage_lines == 0);
+        render_menubox(menu_sprite, "6",  dp.menu_garbage_6_x_in_sprite,  dp.menu_garbage_value_y_in_sprite, dp.menu_garbage_value_width, dp.menu_garbage_value_height, 2, focused_item == MenuFocusedItem::GARBAGE_LINES, selected_garbage_lines == 6);
+        render_menubox(menu_sprite, "12", dp.menu_garbage_12_x_in_sprite, dp.menu_garbage_value_y_in_sprite, dp.menu_garbage_value_width, dp.menu_garbage_value_height, 2, focused_item == MenuFocusedItem::GARBAGE_LINES, selected_garbage_lines == 12);
 
         ButtonState btns = input.get();
-        if (btns.A && !was_a) return;
+        if (btns.A && !prev_state.A) return;
 
-        if (btns.UP && !was_up) {
-          if (cur_focus_mode == GameMode::Endless) cur_focus_mode = GameMode::L999;
-          else if (cur_focus_mode == GameMode::L40) cur_focus_mode = GameMode::Endless;
-          else if (cur_focus_mode == GameMode::L150) cur_focus_mode = GameMode::L40;
-          else if (cur_focus_mode == GameMode::L999) cur_focus_mode = GameMode::L150;
-        } else if (btns.DOWN && !was_down) {
-          if (cur_focus_mode == GameMode::Endless) cur_focus_mode = GameMode::L40;
-          else if (cur_focus_mode == GameMode::L40) cur_focus_mode = GameMode::L150;
-          else if (cur_focus_mode == GameMode::L150) cur_focus_mode = GameMode::L999;
-          else if (cur_focus_mode == GameMode::L999) cur_focus_mode = GameMode::Endless;
+        if (btns.UP && !prev_state.UP) {
+          if (focused_item == MenuFocusedItem::STARTING_LEVEL) focused_item = MenuFocusedItem::MODE;
+          else if (focused_item == MenuFocusedItem::GARBAGE_LINES) focused_item = MenuFocusedItem::STARTING_LEVEL;
+
+        } else if (btns.DOWN && !prev_state.DOWN) {
+          if (focused_item == MenuFocusedItem::MODE) focused_item = MenuFocusedItem::STARTING_LEVEL;
+          else if (focused_item == MenuFocusedItem::STARTING_LEVEL) focused_item = MenuFocusedItem::GARBAGE_LINES;
+
+        } else if (btns.LEFT && !prev_state.LEFT) {
+          if (focused_item == MenuFocusedItem::MODE) {
+            if (selected_mode == GameMode::L150) selected_mode = GameMode::L99999;
+            else if (selected_mode == GameMode::L40) selected_mode = GameMode::L150;
+
+          } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
+            if (selected_starting_level == 10) selected_starting_level = 1;
+            else if (selected_starting_level == 20) selected_starting_level = 10;
+
+          } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
+            if (selected_garbage_lines == 6) selected_garbage_lines = 0;
+            else if (selected_garbage_lines == 12) selected_garbage_lines = 6;
+          }
+          
+        } else if (btns.RIGHT && !prev_state.RIGHT) {
+          if (focused_item == MenuFocusedItem::MODE) {
+            if (selected_mode == GameMode::L99999) selected_mode = GameMode::L150;
+            else if (selected_mode == GameMode::L150) selected_mode = GameMode::L40;
+
+          } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
+            if (selected_starting_level == 1) selected_starting_level = 10;
+            else if (selected_starting_level == 10) selected_starting_level = 20;
+
+          } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
+            if (selected_garbage_lines == 0) selected_garbage_lines = 6;
+            else if (selected_garbage_lines == 6) selected_garbage_lines = 12;
+          }
         }
-
-        was_up = btns.UP;
-        was_down = btns.DOWN;
-        was_a = btns.A;
+        prev_state = btns;
 
         menu_sprite.pushSprite(dp.menu_sprite_x, dp.menu_sprite_y);
 
@@ -184,8 +232,8 @@ class YomoTetris {
       result_sprite.drawString("LPM"       , dp.result_label_x_in_sprite, dp.result_lpm_y_in_sprite      , 1);
 
       // render values
-      std::string code_str = result.mode == GameMode::Endless ? "Result" : result.code == GameResultCode::Clear ? "Clear!!" : result.code == GameResultCode::Fail ? "Fail..." : "Canceled";
-      uint16_t result_color = result.mode == GameMode::Endless ? TFT_WHITE : result.code == GameResultCode::Clear ? TFT_GREEN : result.code == GameResultCode::Fail ? TFT_ORANGE : TFT_WHITE;
+      std::string code_str = result.code == GameResultCode::Clear ? "Clear!!" : result.code == GameResultCode::Fail ? "Fail..." : "Canceled";
+      uint16_t result_color = result.code == GameResultCode::Clear ? TFT_GREEN : result.code == GameResultCode::Fail ? TFT_ORANGE : TFT_WHITE;
 
       // code is center with a specific color
       result_sprite.setTextColor(result_color, TFT_BLACK);
@@ -239,7 +287,7 @@ class YomoTetris {
       while (true) {
         screen.fillScreen(TFT_BLACK);
         menu();
-        Game* game = new Game(cur_focus_mode, level, garbage_lines, input, screen, dp);
+        Game* game = new Game(selected_mode, selected_starting_level, selected_garbage_lines, input, screen, dp);
         GameResult result = game->start();
         delete game;
         if (result.code != GameResultCode::Cancel) {

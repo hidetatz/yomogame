@@ -255,7 +255,7 @@ class GameLogic {
     }
 
     int current_goal() {
-      int goal = mode == GameMode::Endless ? 0 : mode == GameMode::L40 ? 40 : mode == GameMode::L150 ? 150 : 999;
+      int goal = mode == GameMode::L40 ? 40 : mode == GameMode::L150 ? 150 : 99999;
       return goal - removed_lines;
     }
 
@@ -587,7 +587,7 @@ class GameLogic {
               lockdown_judging = false;
               move_cnt_while_lockdown_judging = 0;
             }
-            cleared = (!(mode == GameMode::Endless) && current_goal() <= 0);
+            cleared = current_goal() <= 0;
           }
         }
 
@@ -653,8 +653,7 @@ class GameLogic {
       snap.tetris_count = tetris_count;
       snap.tspins       = tspins;
       snap.combos       = combos;
-      snap.top_stat     = mode == GameMode::Endless ? removed_lines : current_goal();
-      snap.is_endless   = (mode == GameMode::Endless);
+      snap.goal     = current_goal();
 
       unsigned long elapsed_ms = millis() - game_started_at;
       snap.elapsed_ms = elapsed_ms;

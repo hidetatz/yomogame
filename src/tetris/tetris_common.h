@@ -429,7 +429,7 @@ class Board {
 
 
 enum class GameMode {
-  Endless, L40, L150, L999
+  L99999, L150, L40
 };
 
 enum class GameResultCode {
