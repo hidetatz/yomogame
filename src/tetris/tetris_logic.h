@@ -354,7 +354,7 @@ class GameLogic {
     }
 
     int current_level() {
-      return starting_level + (removed_lines / 2);
+      return starting_level + (removed_lines / 10);
     }
 
     double current_tpm() {

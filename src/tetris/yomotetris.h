@@ -122,7 +122,6 @@ class YomoTetris {
 
     void render_menu_label(TFT_eSprite& sprite, std::string str, int x, int y, uint8_t font, boolean focused) {
       uint16_t char_color = focused ? TFT_ORANGE : TFT_DARKGREY;
-      std::string s = focused ? "> " + str : str;
       sprite.setTextColor(char_color, TFT_BLACK);
       sprite.setTextDatum(TL_DATUM);
       sprite.drawString(str.c_str(), x, y, font);
@@ -288,6 +287,18 @@ class YomoTetris {
         screen.fillScreen(TFT_BLACK);
         menu();
         Game* game = new Game(selected_mode, selected_starting_level, selected_garbage_lines, input, screen, dp);
+
+        // countdown
+        screen.fillScreen(TFT_BLACK);
+        screen.setTextColor(TFT_WHITE, TFT_BLACK);
+        screen.setTextDatum(MC_DATUM);
+        screen.drawString("3", dp.menu_sprite_width / 2, dp.menu_sprite_height / 2, 2);
+        delay(700);
+        screen.drawString("2", dp.menu_sprite_width / 2, dp.menu_sprite_height / 2, 2);
+        delay(700);
+        screen.drawString("1", dp.menu_sprite_width / 2, dp.menu_sprite_height / 2, 2);
+        delay(700);
+
         GameResult result = game->start();
         delete game;
         if (result.code != GameResultCode::Cancel) {
