@@ -12,6 +12,8 @@ namespace audio {
 
 class Audio {
   public:
+    uint32_t sample_rate{22050};
+
     Audio(int pin_BCLK, int pin_LRC, int pin_DIN, input::VolumeButtons& vol) :
     pin_BCLK(pin_BCLK),
     pin_LRC(pin_LRC),
@@ -71,7 +73,6 @@ class Audio {
 
     input::VolumeButtons& vol;
 
-    uint32_t sample_rate{22050};
     int dma_buf_count{8};
     int dma_buf_len{256};
 

@@ -40,10 +40,14 @@ class Sound {
       audio.init();
 
       File bgm;
-      bool bgm_on = false;
+      bool want_bgm = false;
 
       int16_t bgm_chunk[256];
       int16_t i2s_buf[512];
+
+      int fade_ms = 150;
+      float fade_step = 1.0f / (audio.sample_rate * fade_ms / 1000.0f);
+      float fade = 0.0f;
 
       while (true) {
         Command c;
@@ -52,14 +56,15 @@ class Sound {
             case Command::StartBGM:
               if (bgm) bgm.close();
               bgm = LittleFS.open(BGM_PATH, "r");
-              bgm_on = (bool)bgm;
-              if (!bgm_on) Serial.println("[audio] bgm open failed (uploadfs?)");
+              want_bgm = (bool)bgm;
+              fade = 0.0;
+              if (!want_bgm) Serial.println("[audio] bgm open failed (uploadfs?)");
               break;
-            case Command::StopBGM: bgm_on = false; break;
+            case Command::StopBGM: want_bgm = false; break;
           }
         }
 
-        if (bgm_on && bgm) {
+        if (bgm) {
           int got = bgm.read((uint8_t*)bgm_chunk, sizeof(bgm_chunk)) / 2;
           while (got < 256) {
             bgm.seek(0);
@@ -70,15 +75,22 @@ class Sound {
           for (int i = got; i < 256; i++) bgm_chunk[i] = 0;
         } else {
           memset(bgm_chunk, 0, sizeof(bgm_chunk));
-          if (!bgm_on && bgm) bgm.close();
         }
 
-        // --- ミックス ---
+        // apply fade
+        float fade_target = want_bgm ? 1.0f : 0.0f;
         for (int i = 0; i < 256; i++) {
-          int32_t acc = ((int32_t)bgm_chunk[i]);
-          i2s_buf[2 * i]     = (int16_t)acc;
-          i2s_buf[2 * i + 1] = (int16_t)acc;
+          // fade in
+          if (fade < fade_target) { fade += fade_step; if (fade > fade_target) fade = fade_target; }
+          // fade out
+          else if (fade > fade_target) { fade -= fade_step; if (fade < fade_target) fade = fade_target; }
+
+          int32_t s = ((int32_t)bgm_chunk[i] * fade);
+          i2s_buf[2 * i]     = (int16_t)s;
+          i2s_buf[2 * i + 1] = (int16_t)s;
         }
+
+        if (!want_bgm && fade == 0.0f && bgm) bgm.close();
 
         audio.send_buffer(i2s_buf, 512);
       }
