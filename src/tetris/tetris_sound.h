@@ -14,7 +14,7 @@
 #include <freertos/queue.h>
 
 struct Command {
-  enum Type : uint8_t { PlayMenuCursorMoveSFX, PlayClearLines123SFX, StartBGM, StopBGM } type;
+  enum Type : uint8_t { PlayCursorSFX, PlayCountdownSFX, PlayHardDropSFX, PlayHoldSFX, PlayClearLines123SFX, PlayTetrisSFX, PlayPauseSFX, PlayResumeSFX, PlayCancelSFX, PlaySuccessSFX, PlayFailSFX, StartBGM, StopBGM } type;
 };
 
 class SFX {
@@ -24,6 +24,10 @@ class SFX {
 
     SFX(std::string filepath) {
       File f = LittleFS.open(filepath.c_str(), "r");
+      if (!f) {
+        Serial.printf("file %s not found\n", filepath.c_str());
+        abort();
+      }
       size_t bytes = f.size();
       pcm = (int16_t*)heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
       f.read((uint8_t*)pcm, bytes);
@@ -55,8 +59,17 @@ class Sound {
       audio.init();
 
       // load sfx on ram
-      SFX menu_move_cursor = SFX("/tetris/sfx_menu_move_cursor.raw");
+      SFX cursor = SFX("/tetris/sfx_cursor.raw");
+      SFX countdown = SFX("/tetris/sfx_countdown.raw");
+      SFX hard_drop = SFX("/tetris/sfx_hard_drop.raw");
+      SFX hold = SFX("/tetris/sfx_hold.raw");
       SFX clear_lines_123 = SFX("/tetris/sfx_clear_lines_123.raw");
+      SFX tetris = SFX("/tetris/sfx_tetris.raw");
+      SFX pause = SFX("/tetris/sfx_pause.raw");
+      SFX resume = SFX("/tetris/sfx_resume.raw");
+      SFX cancel = SFX("/tetris/sfx_cancel.raw");
+      SFX success = SFX("/tetris/sfx_success.raw");
+      SFX fail = SFX("/tetris/sfx_fail.raw");
 
       File bgm;
       bool want_bgm = false;
@@ -72,11 +85,38 @@ class Sound {
         Command c;
         while (xQueueReceive(queue, &c, 0) == pdTRUE) {
           switch (c.type) {
-            case Command::PlayMenuCursorMoveSFX:
-              enqueue_voice(menu_move_cursor);
+            case Command::PlayCursorSFX:
+              enqueue_voice(cursor);
+              break;
+            case Command::PlayCountdownSFX:
+              enqueue_voice(countdown);
+              break;
+            case Command::PlayHardDropSFX:
+              enqueue_voice(hard_drop);
+              break;
+            case Command::PlayHoldSFX:
+              enqueue_voice(hold);
               break;
             case Command::PlayClearLines123SFX:
               enqueue_voice(clear_lines_123);
+              break;
+            case Command::PlayTetrisSFX:
+              enqueue_voice(tetris);
+              break;
+            case Command::PlayPauseSFX:
+              enqueue_voice(pause);
+              break;
+            case Command::PlayResumeSFX:
+              enqueue_voice(resume);
+              break;
+            case Command::PlayCancelSFX:
+              enqueue_voice(cancel);
+              break;
+            case Command::PlaySuccessSFX:
+              enqueue_voice(success);
+              break;
+            case Command::PlayFailSFX:
+              enqueue_voice(fail);
               break;
             case Command::StartBGM:
               if (bgm) bgm.close();
@@ -133,10 +173,19 @@ class Sound {
       }
     }
 
-    void sound_menu_cursor_move() { send(Command::PlayMenuCursorMoveSFX); }
+    void sound_cursor()          { send(Command::PlayCursorSFX); }
+    void sound_countdown()       { send(Command::PlayCountdownSFX); }
+    void sound_hard_drop()       { send(Command::PlayHardDropSFX); }
+    void sound_hold()            { send(Command::PlayHoldSFX); }
     void sound_clear_lines_123() { send(Command::PlayClearLines123SFX); }
-    void start_bgm() { send(Command::StartBGM); }
-    void stop_bgm() { send(Command::StopBGM); }
+    void sound_tetris()          { send(Command::PlayTetrisSFX); }
+    void sound_pause()           { send(Command::PlayPauseSFX); }
+    void sound_resume()          { send(Command::PlayResumeSFX); }
+    void sound_cancel()          { send(Command::PlayCancelSFX); }
+    void sound_success()         { send(Command::PlaySuccessSFX); }
+    void sound_fail()            { send(Command::PlayFailSFX); }
+    void start_bgm()             { send(Command::StartBGM); }
+    void stop_bgm()              { send(Command::StopBGM); }
 
   private:
     QueueHandle_t queue = nullptr;

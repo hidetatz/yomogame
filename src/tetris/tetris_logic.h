@@ -304,7 +304,8 @@ class GameLogic {
         return true;
       }
 
-      if (count != 4) sound.sound_clear_lines_123();
+      if (count == 4) sound.sound_tetris();
+      else sound.sound_clear_lines_123();
 
       for (int i = 0; i < 3; i++) {
         // delete animation
@@ -464,21 +465,29 @@ class GameLogic {
         bool cleared = false;
 
         if (btns.START && !prev_input.START) {
-          paused = !paused;
-          if (paused) pause_selected = PauseOption::RESUME;
-          else free_fall_timer = now;
+          if (!paused) {
+            paused = true;
+            pause_selected = PauseOption::RESUME;
+            sound.stop_bgm();
+            sound.sound_pause();
+          }
         }
 
         if (paused) {
-          if ((btns.UP && !prev_input.UP) || (btns.DOWN && !prev_input.DOWN))
+          if ((btns.UP && !prev_input.UP) || (btns.DOWN && !prev_input.DOWN)) {
+            sound.sound_cursor();
             pause_selected = (pause_selected == PauseOption::RESUME) ? PauseOption::QUIT : PauseOption::RESUME;
+          }
 
           if (btns.A && !prev_input.A) {
             if (pause_selected == PauseOption::QUIT) {
+              sound.sound_cancel();
               quitted = true;
             } else {
+              sound.sound_resume();
               paused = false;
               free_fall_timer = now;
+              sound.start_bgm();
             }
           }
         } else {
@@ -491,6 +500,7 @@ class GameLogic {
           if (!failed) {
             // check hard drop
             if (btns.UP && !prev_input.UP) {
+              sound.sound_hard_drop();
               int i = 0;
               while (try_move(MoveDirection::DOWN, 1, now)) i++;
               score += 2 * i;
@@ -500,22 +510,23 @@ class GameLogic {
               // because R button does not exist, uses SELECT press as hold
               if (btns.SELECT) {
                 if (!hold_once_tried && board.cur_mino_exists()) {
+                  sound.sound_hold();
                   hold_once_tried = true;
 
                   // flash animation
-                  for (int i = 0; i < 3; i++) {
-                    // render flashed (white) lines
-                    board.cur_mino->flash();
-                    if (hold_mino.has_value()) hold_mino->flash();
-                    publish_snapshot();
-                    vTaskDelay(pdMS_TO_TICKS(30));
+                  // for (int i = 0; i < 3; i++) {
+                  //   // render flashed (white) lines
+                  //   board.cur_mino->flash();
+                  //   if (hold_mino.has_value()) hold_mino->flash();
+                  //   publish_snapshot();
+                  //   vTaskDelay(pdMS_TO_TICKS(30));
 
-                    // render original lines
-                    board.cur_mino->stop_flash();
-                    if (hold_mino.has_value()) hold_mino->stop_flash();
-                    publish_snapshot();
-                    vTaskDelay(pdMS_TO_TICKS(30));
-                  }
+                  //   // render original lines
+                  //   board.cur_mino->stop_flash();
+                  //   if (hold_mino.has_value()) hold_mino->stop_flash();
+                  //   publish_snapshot();
+                  //   vTaskDelay(pdMS_TO_TICKS(30));
+                  // }
 
                   // temporary save current hold mino
                   std::optional<Mino> temp = hold_mino;

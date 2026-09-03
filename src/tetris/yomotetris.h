@@ -173,48 +173,48 @@ class YomoTetris {
 
         if (btns.UP && !prev_state.UP) {
           if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
-            sound.sound_menu_cursor_move();
+            sound.sound_cursor();
             focused_item = MenuFocusedItem::MODE;
 
           } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
-            sound.sound_menu_cursor_move();
+            sound.sound_cursor();
             focused_item = MenuFocusedItem::STARTING_LEVEL;
           }
 
         } else if (btns.DOWN && !prev_state.DOWN) {
           if (focused_item == MenuFocusedItem::MODE) {
-            sound.sound_menu_cursor_move();
+            sound.sound_cursor();
             focused_item = MenuFocusedItem::STARTING_LEVEL;
           } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
-            sound.sound_menu_cursor_move();
+            sound.sound_cursor();
             focused_item = MenuFocusedItem::GARBAGE_LINES;
           }
 
         } else if (btns.LEFT && !prev_state.LEFT) {
           if (focused_item == MenuFocusedItem::MODE) {
             if (selected_mode == GameMode::L150) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_mode = GameMode::L99999;
             } else if (selected_mode == GameMode::L40) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_mode = GameMode::L150;
             }
 
           } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
             if (selected_starting_level == 10) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_starting_level = 1;
             } else if (selected_starting_level == 20) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_starting_level = 10;
             }
 
           } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
             if (selected_garbage_lines == 6) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_garbage_lines = 0;
             } else if (selected_garbage_lines == 12) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_garbage_lines = 6;
             }
           }
@@ -222,28 +222,28 @@ class YomoTetris {
         } else if (btns.RIGHT && !prev_state.RIGHT) {
           if (focused_item == MenuFocusedItem::MODE) {
             if (selected_mode == GameMode::L99999) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_mode = GameMode::L150;
             } else if (selected_mode == GameMode::L150) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_mode = GameMode::L40;
             }
 
           } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
             if (selected_starting_level == 1) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_starting_level = 10;
             } else if (selected_starting_level == 10) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_starting_level = 20;
             }
 
           } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
             if (selected_garbage_lines == 0) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_garbage_lines = 6;
             } else if (selected_garbage_lines == 6) {
-              sound.sound_menu_cursor_move();
+              sound.sound_cursor();
               selected_garbage_lines = 12;
             }
           }
@@ -338,10 +338,16 @@ class YomoTetris {
         screen.fillScreen(TFT_BLACK);
         screen.setTextColor(TFT_WHITE, TFT_BLACK);
         screen.setTextDatum(MC_DATUM);
+
+        sound.sound_countdown();
         screen.drawString("3", dp.menu_sprite_width / 2, dp.menu_sprite_height / 2, 2);
         delay(700);
+
+        sound.sound_countdown();
         screen.drawString("2", dp.menu_sprite_width / 2, dp.menu_sprite_height / 2, 2);
         delay(700);
+
+        sound.sound_countdown();
         screen.drawString("1", dp.menu_sprite_width / 2, dp.menu_sprite_height / 2, 2);
         delay(700);
 
@@ -352,6 +358,8 @@ class YomoTetris {
         delete game;
         if (result.code != GameResultCode::Cancel) {
           delay(500);
+          if (result.code == GameResultCode::Clear) sound.sound_success();
+          else if (result.code == GameResultCode::Fail) sound.sound_fail();
           show_result(result);
         }
         delay(100);
