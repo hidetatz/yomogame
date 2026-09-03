@@ -14,6 +14,7 @@
 
 #include "tetris_common.h"
 #include "tetris_buffer.h"
+#include "tetris_sound.h"
 
 const int horizontal_move_first_wait_ms = 300;
 const int horizontal_move_auto_repeating_wait_ms = 50;
@@ -28,6 +29,8 @@ class GameLogic {
   public:
     GameMode mode;
     int starting_level{1};
+
+    Sound& sound;
 
     Board board;
     std::array<MinoType, 7> cur_bag;
@@ -76,9 +79,10 @@ class GameLogic {
     std::optional<GameResult> final_result;
 
   public:
-    GameLogic(TripleBuffer &tb, GameMode mode, int level, int garbage_lines, input::Buttons &buttons, SemaphoreHandle_t logic_done_sem) :
+    GameLogic(TripleBuffer &tb, GameMode mode, int level, Sound& sound, int garbage_lines, input::Buttons &buttons, SemaphoreHandle_t logic_done_sem) :
       mode(mode),
       starting_level(level),
+      sound(sound),
       board(garbage_lines),
       cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
@@ -299,6 +303,8 @@ class GameLogic {
         score += cur_level * base_score;
         return true;
       }
+
+      if (count != 4) sound.sound_clear_lines_123();
 
       for (int i = 0; i < 3; i++) {
         // delete animation

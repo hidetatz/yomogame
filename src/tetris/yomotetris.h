@@ -28,9 +28,9 @@ class Game {
     TaskHandle_t logic_task_handle;
     TaskHandle_t render_task_handle;
 
-    Game(GameMode mode, int level, int garbage_lines, input::Buttons &buttons, TFT_eSPI &screen, DisplayParameters &params) :
+    Game(GameMode mode, int level, Sound& sound, int garbage_lines, input::Buttons &buttons, TFT_eSPI &screen, DisplayParameters &params) :
       logic_done_sem(xSemaphoreCreateBinary()),
-      logic(tb, mode, level, garbage_lines, buttons, logic_done_sem),
+      logic(tb, mode, level, sound, garbage_lines, buttons, logic_done_sem),
       renderer(tb, screen, params, logic_running),
       logic_task_handle(nullptr),
       render_task_handle(nullptr)
@@ -172,39 +172,80 @@ class YomoTetris {
         if (btns.A && !prev_state.A) return;
 
         if (btns.UP && !prev_state.UP) {
-          if (focused_item == MenuFocusedItem::STARTING_LEVEL) focused_item = MenuFocusedItem::MODE;
-          else if (focused_item == MenuFocusedItem::GARBAGE_LINES) focused_item = MenuFocusedItem::STARTING_LEVEL;
+          if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
+            sound.sound_menu_cursor_move();
+            focused_item = MenuFocusedItem::MODE;
+
+          } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
+            sound.sound_menu_cursor_move();
+            focused_item = MenuFocusedItem::STARTING_LEVEL;
+          }
 
         } else if (btns.DOWN && !prev_state.DOWN) {
-          if (focused_item == MenuFocusedItem::MODE) focused_item = MenuFocusedItem::STARTING_LEVEL;
-          else if (focused_item == MenuFocusedItem::STARTING_LEVEL) focused_item = MenuFocusedItem::GARBAGE_LINES;
+          if (focused_item == MenuFocusedItem::MODE) {
+            sound.sound_menu_cursor_move();
+            focused_item = MenuFocusedItem::STARTING_LEVEL;
+          } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
+            sound.sound_menu_cursor_move();
+            focused_item = MenuFocusedItem::GARBAGE_LINES;
+          }
 
         } else if (btns.LEFT && !prev_state.LEFT) {
           if (focused_item == MenuFocusedItem::MODE) {
-            if (selected_mode == GameMode::L150) selected_mode = GameMode::L99999;
-            else if (selected_mode == GameMode::L40) selected_mode = GameMode::L150;
+            if (selected_mode == GameMode::L150) {
+              sound.sound_menu_cursor_move();
+              selected_mode = GameMode::L99999;
+            } else if (selected_mode == GameMode::L40) {
+              sound.sound_menu_cursor_move();
+              selected_mode = GameMode::L150;
+            }
 
           } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
-            if (selected_starting_level == 10) selected_starting_level = 1;
-            else if (selected_starting_level == 20) selected_starting_level = 10;
+            if (selected_starting_level == 10) {
+              sound.sound_menu_cursor_move();
+              selected_starting_level = 1;
+            } else if (selected_starting_level == 20) {
+              sound.sound_menu_cursor_move();
+              selected_starting_level = 10;
+            }
 
           } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
-            if (selected_garbage_lines == 6) selected_garbage_lines = 0;
-            else if (selected_garbage_lines == 12) selected_garbage_lines = 6;
+            if (selected_garbage_lines == 6) {
+              sound.sound_menu_cursor_move();
+              selected_garbage_lines = 0;
+            } else if (selected_garbage_lines == 12) {
+              sound.sound_menu_cursor_move();
+              selected_garbage_lines = 6;
+            }
           }
           
         } else if (btns.RIGHT && !prev_state.RIGHT) {
           if (focused_item == MenuFocusedItem::MODE) {
-            if (selected_mode == GameMode::L99999) selected_mode = GameMode::L150;
-            else if (selected_mode == GameMode::L150) selected_mode = GameMode::L40;
+            if (selected_mode == GameMode::L99999) {
+              sound.sound_menu_cursor_move();
+              selected_mode = GameMode::L150;
+            } else if (selected_mode == GameMode::L150) {
+              sound.sound_menu_cursor_move();
+              selected_mode = GameMode::L40;
+            }
 
           } else if (focused_item == MenuFocusedItem::STARTING_LEVEL) {
-            if (selected_starting_level == 1) selected_starting_level = 10;
-            else if (selected_starting_level == 10) selected_starting_level = 20;
+            if (selected_starting_level == 1) {
+              sound.sound_menu_cursor_move();
+              selected_starting_level = 10;
+            } else if (selected_starting_level == 10) {
+              sound.sound_menu_cursor_move();
+              selected_starting_level = 20;
+            }
 
           } else if (focused_item == MenuFocusedItem::GARBAGE_LINES) {
-            if (selected_garbage_lines == 0) selected_garbage_lines = 6;
-            else if (selected_garbage_lines == 6) selected_garbage_lines = 12;
+            if (selected_garbage_lines == 0) {
+              sound.sound_menu_cursor_move();
+              selected_garbage_lines = 6;
+            } else if (selected_garbage_lines == 6) {
+              sound.sound_menu_cursor_move();
+              selected_garbage_lines = 12;
+            }
           }
         }
         prev_state = btns;
@@ -291,7 +332,7 @@ class YomoTetris {
       while (true) {
         screen.fillScreen(TFT_BLACK);
         menu();
-        Game* game = new Game(selected_mode, selected_starting_level, selected_garbage_lines, buttons, screen, dp);
+        Game* game = new Game(selected_mode, selected_starting_level, sound, selected_garbage_lines, buttons, screen, dp);
 
         // countdown
         screen.fillScreen(TFT_BLACK);
