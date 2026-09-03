@@ -54,7 +54,7 @@ class Audio {
     }
 
     int send_buffer(int16_t *buffer, int length) {
-      float gain = (float) master_volume / volume_max;
+      float gain = vol_gains[master_volume.load()];
       for (int i = 0; i < length; i++) {
         int32_t v = (int32_t)(buffer[i] * gain);
         if (v > 32767) v = 32767;
@@ -72,6 +72,7 @@ class Audio {
     int pin_DIN;
 
     input::VolumeButtons& vol;
+    float vol_gains[9]{0.0f, 0.0178f, 0.0316f, 0.0562f, 0.100f, 0.178f, 0.316f, 0.562f, 1.0f};
 
     int dma_buf_count{8};
     int dma_buf_len{256};
