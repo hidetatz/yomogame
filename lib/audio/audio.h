@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include <driver/i2s.h>
+#include <Preferences.h>
 
 namespace audio {
 
@@ -21,6 +22,9 @@ class Audio {
     vol(vol) {}
 
     void init() {
+      prefs.begin("audio", false);
+      master_volume.store(std::clamp(prefs.getInt("volume", 5), 0, volume_max));
+
       /* configure i2s */
 
       i2s_config_t cfg = {
@@ -84,11 +88,17 @@ class Audio {
     std::atomic<int> master_volume{5};
     const int volume_max{16};
 
+    Preferences prefs;
+
     static void volume_monitoring_task_trampoline(void* param) {
       static_cast<Audio*>(param)->volume_monitoring_task();
     }
 
-    void set_volume(int v) { master_volume.store(std::clamp(v, 0, volume_max)); }
+    void set_volume(int v) {
+      int clamped = std::clamp(v, 0, volume_max);
+      master_volume.store(clamped);
+      prefs.putInt("volume", clamped);
+    }
 
     void volume_monitoring_task() {
       input::VolumeButtonState prev;
