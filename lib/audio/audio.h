@@ -72,13 +72,17 @@ class Audio {
     int pin_DIN;
 
     input::VolumeButtons& vol;
-    float vol_gains[9]{0.0f, 0.0178f, 0.0316f, 0.0562f, 0.100f, 0.178f, 0.316f, 0.562f, 1.0f};
+
+    float vol_gains[17]{
+      0.0000f, 0.0056f, 0.0079f, 0.0112f, 0.0158f, 0.0224f, 0.0316f, 0.0447f,
+      0.0631f, 0.0891f, 0.1259f, 0.1778f, 0.2512f, 0.3548f, 0.5012f, 0.7079f, 1.0000f
+    };
 
     int dma_buf_count{8};
     int dma_buf_len{256};
 
-    std::atomic<int> master_volume{3};
-    const int volume_max{8};
+    std::atomic<int> master_volume{5};
+    const int volume_max{16};
 
     static void volume_monitoring_task_trampoline(void* param) {
       static_cast<Audio*>(param)->volume_monitoring_task();
