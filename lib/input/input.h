@@ -1,66 +1,71 @@
 #pragma once
 #include <Arduino.h>
 
-struct ButtonState {
-  boolean A{false};
-  boolean B{false};
-  boolean START{false};
-  boolean SELECT{false};
-  boolean RIGHT{false};
-  boolean UP{false};
-  boolean DOWN{false};
-  boolean LEFT{false};
-};
+namespace input {
+  class Button {
+    public:
+      Button(int pin) : pin(pin) { pinMode(pin, INPUT_PULLUP); }
 
-const int BUTTON_COUNT = 8;
-
-class Input {
-  private:
-    int pins[BUTTON_COUNT];
-
-    boolean stable_state[BUTTON_COUNT];
-    boolean last_raw_state[BUTTON_COUNT];
-    unsigned long last_change_at[BUTTON_COUNT];
-
-    const unsigned long debounce_ms = 5;
-
-  public:
-    Input(int pinA, int pinB, int pinSTART, int pinSELECT, int pinRIGHT, int pinUP, int pinDOWN, int pinLEFT) {
-      pins[0] = pinA;
-      pins[1] = pinB;
-      pins[2] = pinSTART;
-      pins[3] = pinSELECT;
-      pins[4] = pinRIGHT;
-      pins[5] = pinUP;
-      pins[6] = pinDOWN;
-      pins[7] = pinLEFT;
-
-      unsigned long now = millis();
-      for (int i = 0; i < BUTTON_COUNT; i++) {
-        pinMode(pins[i], INPUT_PULLUP);
-        stable_state[i] = false;
-        last_raw_state[i] = false;
-        last_change_at[i] = now;
-      }
-    }
-
-    ButtonState get() {
-      unsigned long now = millis();
-
-      for (int i = 0; i < BUTTON_COUNT; i++) {
-        boolean raw = (digitalRead(pins[i]) == LOW);
-
-        if (raw != last_raw_state[i]) {
-          last_raw_state[i] = raw;
-          last_change_at[i] = now;
-        } else if (raw != stable_state[i] && (now - last_change_at[i]) >= debounce_ms) {
-          stable_state[i] = raw;
+      bool read() {
+        unsigned long now = millis();
+        bool raw = (digitalRead(pin) == LOW);
+        if (raw != last_raw) {
+          last_raw = raw;
+          last_change = now;
+        } else if (raw != stable && (now - last_change) >= 10) { // debounce
+          stable = raw;
         }
+        return stable;
       }
 
-      return ButtonState{
-        stable_state[0], stable_state[1], stable_state[2], stable_state[3],
-        stable_state[4], stable_state[5], stable_state[6], stable_state[7]
-      };
-    }
-};
+    private:
+      int pin;
+      bool stable{false};
+      bool last_raw{false};
+      unsigned long last_change{millis()};
+  };
+
+  struct ButtonState {
+    boolean A{false};
+    boolean B{false};
+    boolean START{false};
+    boolean SELECT{false};
+    boolean RIGHT{false};
+    boolean UP{false};
+    boolean DOWN{false};
+    boolean LEFT{false};
+  };
+
+  class Buttons {
+    public:
+      Buttons(int pin_A, int pin_B, int pin_START, int pin_SELECT, int pin_RIGHT, int pin_UP, int pin_DOWN, int pin_LEFT) :
+        buttons{Button(pin_A), Button(pin_B), Button(pin_START), Button(pin_SELECT), Button(pin_RIGHT), Button(pin_UP), Button(pin_DOWN), Button(pin_LEFT)} {}
+
+      ButtonState get() {
+        return ButtonState{
+          buttons[0].read(), buttons[1].read(), buttons[2].read(), buttons[3].read(),
+          buttons[4].read(), buttons[5].read(), buttons[6].read(), buttons[7].read(),
+        };
+      }
+
+    private:
+      Button buttons[8];
+  };
+
+  struct VolumeButtonState {
+    boolean UP{false};
+    boolean DOWN{false};
+  };
+
+  class VolumeButtons {
+    public:
+      VolumeButtons(int pin_UP, int pin_DOWN) : buttons{Button(pin_UP), Button(pin_DOWN)} {}
+
+      VolumeButtonState get() {
+        return VolumeButtonState{buttons[0].read(), buttons[1].read()};
+      }
+
+    private:
+      Button buttons[2];
+  };
+} // namespace input

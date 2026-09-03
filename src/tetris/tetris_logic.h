@@ -64,7 +64,7 @@ class GameLogic {
     int max_combos{0};
 
     // input
-    Input &input;
+    input::Buttons &buttons;
 
     // buffer
     TripleBuffer &triple_buffer;
@@ -76,13 +76,13 @@ class GameLogic {
     std::optional<GameResult> final_result;
 
   public:
-    GameLogic(TripleBuffer &tb, GameMode mode, int level, int garbage_lines, Input &input, SemaphoreHandle_t logic_done_sem) :
+    GameLogic(TripleBuffer &tb, GameMode mode, int level, int garbage_lines, input::Buttons &buttons, SemaphoreHandle_t logic_done_sem) :
       mode(mode),
       starting_level(level),
       board(garbage_lines),
       cur_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
       next_bag{MinoType::L, MinoType::J, MinoType::I, MinoType::O, MinoType::S, MinoType::Z, MinoType::T},
-      input(input),
+      buttons(buttons),
       triple_buffer(tb),
       done_sem(logic_done_sem)
       {
@@ -443,7 +443,7 @@ class GameLogic {
 
       unsigned long last_soft_dropped = 0;
       boolean horizontal_auto_repeat_started = false;
-      ButtonState prev_input = input.get();
+      input::ButtonState prev_input = buttons.get();
       boolean hard_dropped = false;
 
       unsigned long fps_counter = 0;
@@ -451,7 +451,7 @@ class GameLogic {
 
       while (true) {
         unsigned long now = millis();
-        ButtonState btns = input.get();
+        input::ButtonState btns = buttons.get();
 
         bool failed = false;
         bool quitted = false;

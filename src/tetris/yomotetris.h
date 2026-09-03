@@ -10,11 +10,13 @@
 #include <TFT_eSPI.h>
 
 #include <input.h>
+#include <audio.h>
 
-#include "tetris_common.h"
 #include "tetris_buffer.h"
+#include "tetris_common.h"
 #include "tetris_logic.h"
 #include "tetris_rendering.h"
+#include "tetris_sound.h"
 
 class Game {
   public:
@@ -26,9 +28,9 @@ class Game {
     TaskHandle_t logic_task_handle;
     TaskHandle_t render_task_handle;
 
-    Game(GameMode mode, int level, int garbage_lines, Input &input, TFT_eSPI &screen, DisplayParameters &params) :
+    Game(GameMode mode, int level, int garbage_lines, input::Buttons &buttons, TFT_eSPI &screen, DisplayParameters &params) :
       logic_done_sem(xSemaphoreCreateBinary()),
-      logic(tb, mode, level, garbage_lines, input, logic_done_sem),
+      logic(tb, mode, level, garbage_lines, buttons, logic_done_sem),
       renderer(tb, screen, params, logic_running),
       logic_task_handle(nullptr),
       render_task_handle(nullptr)
@@ -78,14 +80,16 @@ class YomoTetris {
     int selected_garbage_lines{0};
     MenuFocusedItem focused_item{MenuFocusedItem::MODE};
     DisplayParameters dp;
-    Input input;
+    Sound sound;
+    input::Buttons buttons;
     TFT_eSPI &screen;
     TFT_eSprite menu_sprite;
     TFT_eSprite result_sprite;
 
-    YomoTetris(Input input, TFT_eSPI &screen, DisplayParameters params) :
+    YomoTetris(audio::Audio& audio, input::Buttons buttons, TFT_eSPI &screen, DisplayParameters params) :
       dp(params),
-      input(input),
+      sound(audio),
+      buttons(buttons),
       screen(screen),
       menu_sprite(&screen),
       result_sprite(&screen) {
@@ -143,7 +147,7 @@ class YomoTetris {
       render_menu_title(menu_sprite, dp.menu_title_x_center_in_sprite, dp.menu_title_y_in_sprite, 2);
       render_menu_msg(menu_sprite, dp.menu_msg_x_center_in_sprite, dp.menu_msg_y_in_sprite, 2);
 
-      ButtonState prev_state = input.get();
+      input::ButtonState prev_state = buttons.get();
 
       MenuFocusedItem focused_item = MenuFocusedItem::MODE;
 
@@ -164,7 +168,7 @@ class YomoTetris {
         render_menubox(menu_sprite, "6",  dp.menu_garbage_6_x_in_sprite,  dp.menu_garbage_value_y_in_sprite, dp.menu_garbage_value_width, dp.menu_garbage_value_height, 2, focused_item == MenuFocusedItem::GARBAGE_LINES, selected_garbage_lines == 6);
         render_menubox(menu_sprite, "12", dp.menu_garbage_12_x_in_sprite, dp.menu_garbage_value_y_in_sprite, dp.menu_garbage_value_width, dp.menu_garbage_value_height, 2, focused_item == MenuFocusedItem::GARBAGE_LINES, selected_garbage_lines == 12);
 
-        ButtonState btns = input.get();
+        input::ButtonState btns = buttons.get();
         if (btns.A && !prev_state.A) return;
 
         if (btns.UP && !prev_state.UP) {
@@ -276,17 +280,18 @@ class YomoTetris {
       result_sprite.pushSprite(dp.result_sprite_x, dp.result_sprite_y);
 
       while (true) {
-        ButtonState btns = input.get();
+        input::ButtonState btns = buttons.get();
         if (btns.B) return;
         delay(20);
       }
     }
 
     void start() {
+      sound.begin();
       while (true) {
         screen.fillScreen(TFT_BLACK);
         menu();
-        Game* game = new Game(selected_mode, selected_starting_level, selected_garbage_lines, input, screen, dp);
+        Game* game = new Game(selected_mode, selected_starting_level, selected_garbage_lines, buttons, screen, dp);
 
         // countdown
         screen.fillScreen(TFT_BLACK);
@@ -299,7 +304,10 @@ class YomoTetris {
         screen.drawString("1", dp.menu_sprite_width / 2, dp.menu_sprite_height / 2, 2);
         delay(700);
 
+        sound.start_bgm();
         GameResult result = game->start();
+        sound.stop_bgm();
+
         delete game;
         if (result.code != GameResultCode::Cancel) {
           delay(500);
