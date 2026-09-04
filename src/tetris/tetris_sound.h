@@ -112,13 +112,19 @@ class Sound {
           case Command::PlayCancelSFX:        enqueue_voice(cancel); break;
           case Command::PlaySuccessSFX:       enqueue_voice(success); break;
           case Command::PlayFailSFX:          enqueue_voice(fail); break;
-          case Command::StartBGM:
+          case Command::StartBGM: {
             if (bgm) bgm.close();
             bgm = LittleFS.open("/tetris/iwashiro_dokudoku_dog.raw", "r");
             want_bgm = (bool)bgm;
             fade = 0.0f;
-            if (!want_bgm) Serial.println("[audio] bgm open failed (uploadfs?)");
+            int16_t probe[8] = {0};
+            int pn = bgm ? bgm.read((uint8_t*)probe, sizeof(probe)) : -1;
+            if (bgm) bgm.seek(0);
+            Serial.printf("[bgm] open=%d size=%d read=%d [%d %d %d %d]\n",
+                          (int)want_bgm, bgm ? (int)bgm.size() : -1, pn,
+                          probe[0], probe[1], probe[2], probe[3]);
             break;
+          }
           case Command::StopBGM: want_bgm = false; break;
         }
       }

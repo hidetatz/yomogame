@@ -16,6 +16,7 @@
 #include <volume_overlay.h>
 
 #include "../scene.h"
+#include "../frame_pusher.h"
 #include "hw_config.h"
 #include "nes_bridge.h"
 
@@ -82,19 +83,8 @@ class NesScene : public Scene {
 
     // --- bridge entry points (called from osd.cpp on the emulator task) ---
 
-    // The buffer osd_blit renders into this frame.
-    uint16_t* emu_fb() { return fb_[emu_idx_]; }
-
-    // Called on the emulator task once the frame is in fb_[emu_idx_]. Hand it to
-    // the display task and flip to the other buffer. Drop the frame if the
-    // previous push is still running.
-    void blit(const uint16_t*) {
-      if (!fb_[0] || !fb_[1] || disp_busy_) return;
-      disp_idx_ = emu_idx_;
-      emu_idx_ ^= 1;
-      disp_busy_ = true;
-      xSemaphoreGive(frame_sem_);
-    }
+    uint16_t* emu_fb() { return pusher_.back(); }
+    void blit(const uint16_t*) { pusher_.present(); }
 
     void audio_push(const int16_t* mono, int samples) {
       if (audio_ring_) {
@@ -123,25 +113,7 @@ class NesScene : public Scene {
     TaskHandle_t emu_task_{nullptr};
     StreamBufferHandle_t audio_ring_{nullptr};
     audio::Audio* audio_{nullptr};
-
-    uint16_t* fb_[2]{nullptr, nullptr};
-    int emu_idx_{0};                 // touched only by the emulator task
-    int disp_idx_{0};                // set by emu, read by disp (handoff via sem)
-    volatile bool disp_busy_{false};
-    SemaphoreHandle_t frame_sem_{nullptr};
-    TaskHandle_t disp_task_{nullptr};
-
-    static void disp_trampoline(void* p) { static_cast<NesScene*>(p)->disp_loop(); }
-
-    void disp_loop() {
-      for (;;) {
-        xSemaphoreTake(frame_sem_, portMAX_DELAY);
-        screen_->setSwapBytes(false);
-        screen_->pushImage(0, 0, 240, 240, fb_[disp_idx_]);
-        if (overlay_) overlay_->tick(*screen_, TFT_BLACK);
-        disp_busy_ = false;
-      }
-    }
+    FramePusher pusher_;
 
     /* ---- SD ---- */
 
@@ -214,15 +186,7 @@ class NesScene : public Scene {
       audio_ring_ = xStreamBufferCreate(8192, 1);   // ~185ms slack @22050
       ctx.audio.set_source(&NesScene::audio_fill, this);
 
-      // Display task on core 0 does the ~27ms blocking frame push so the
-      // emulator (core 1) never stalls on it. Double-buffered so the emulator
-      // renders one frame while the other is being pushed (no copy).
-      fb_[0] = (uint16_t*)heap_caps_malloc(240 * 240 * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-      fb_[1] = (uint16_t*)heap_caps_malloc(240 * 240 * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-      frame_sem_ = xSemaphoreCreateBinary();
-      xTaskCreatePinnedToCore(&NesScene::disp_trampoline, "nes_disp", 4096, this, 2, &disp_task_, 0);
-
-      ctx.screen.fillScreen(TFT_BLACK);
+      pusher_.begin(*screen_, overlay_, 240, 240, 240, 240, 0, 0);   // core-0 display task, no scaling
       state_ = State::RUN;
 
       // priority 2 so the emulator preempts the shell/volume tasks; it yields

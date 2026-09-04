@@ -23,7 +23,7 @@ class Audio {
       pin_BCLK(pin_BCLK), pin_LRC(pin_LRC), pin_DIN(pin_DIN), vol(vol) {}
 
     void begin() {
-      xTaskCreatePinnedToCore(audio_task_trampoline, "audio", 6144, this, 10, nullptr, 0);
+      xTaskCreatePinnedToCore(audio_task_trampoline, "audio", 8192, this, 10, nullptr, 0);
     }
 
     bool initialized() const { return initialized_.load(); }

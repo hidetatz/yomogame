@@ -14,6 +14,7 @@
 #include "scene.h"
 #include "tetris/tetris.h"
 #include "nes/nes_scene.h"
+#include "gb/gb_scene.h"
 
 namespace yomogame {
 
@@ -30,8 +31,9 @@ class SelectScene : public Scene {
       input::ButtonState b = ctx.buttons.get();
       Scene* next = this;
       if (b.A && !prev_.A) {
-        next = (selected_ == 0) ? (Scene*)new tetris::TetrisScene()
-                                : (Scene*)new nes::NesScene();
+        if      (selected_ == 0) next = new tetris::TetrisScene();
+        else if (selected_ == 1) next = new nes::NesScene();
+        else                     next = new gb::GbScene();
       }
       if (b.DOWN && !prev_.DOWN && selected_ < kCount - 1) { selected_++; dirty_ = true; }
       if (b.UP   && !prev_.UP   && selected_ > 0)          { selected_--; dirty_ = true; }
@@ -40,8 +42,8 @@ class SelectScene : public Scene {
     }
 
   private:
-    static constexpr int kCount = 2;
-    static constexpr const char* kNames[kCount] = {"TETRIS", "NES"};
+    static constexpr int kCount = 3;
+    static constexpr const char* kNames[kCount] = {"TETRIS", "NES", "GB"};
 
     input::ButtonState prev_{};
     int selected_{0};
@@ -52,11 +54,11 @@ class SelectScene : public Scene {
       s.fillScreen(TFT_BLACK);
       s.setTextDatum(MC_DATUM);
       s.setTextColor(TFT_CYAN, TFT_BLACK);
-      s.drawString("SELECT GAME", 120, 45, 2);
+      s.drawString("SELECT GAME", 120, 30, 2);
 
-      const int w = 150, h = 40, x = (240 - w) / 2;
+      const int w = 150, h = 38, x = (240 - w) / 2;
       for (int i = 0; i < kCount; i++) {
-        int y = 85 + i * 55;
+        int y = 62 + i * 48;
         bool sel = i == selected_;
         s.drawRect(x, y, w, h, TFT_WHITE);
         s.fillRect(x + 1, y + 1, w - 2, h - 2, sel ? TFT_ORANGE : TFT_BLACK);
