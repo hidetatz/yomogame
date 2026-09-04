@@ -9,8 +9,7 @@
 #include <TFT_eSPI.h>
 
 #include <yomogi.h>
-#include <volume_overlay.h>
- 
+
 #include "tetris_common.h"
 #include "tetris_buffer.h"
 
@@ -381,9 +380,8 @@ class GameRenderer {
     TFT_eSprite stats_sprite;
     TFT_eSprite pause_sprite;
     std::atomic<bool> &running;
-    volui::VolumeOverlay& vol_overlay;
 
-    GameRenderer(TripleBuffer &tb, TFT_eSPI &screen, DisplayParameters &dp, volui::VolumeOverlay& vol_overlay, std::atomic<bool> &running) :
+    GameRenderer(TripleBuffer &tb, TFT_eSPI &screen, DisplayParameters &dp, std::atomic<bool> &running) :
       tb(tb),
       dp(dp),
       bgcolor(TFT_BLACK),
@@ -393,8 +391,7 @@ class GameRenderer {
       hold_sprite(&screen),
       stats_sprite(&screen),
       pause_sprite(&screen),
-      running(running),
-      vol_overlay(vol_overlay)
+      running(running)
       {}
 
     void setup_screen() {
@@ -437,16 +434,9 @@ class GameRenderer {
       screen.pushImage(dp.yomogi_x, dp.yomogi_y, dp.yomogi_width, dp.yomogi_height, dp.yomogi_image, dp.yomogi_transparent_color);
     }
 
-    void rendering_loop_60fps() {
-      const TickType_t period = pdMS_TO_TICKS(16);
-      TickType_t last_wake = xTaskGetTickCount();
-      while (running) {
-        GameSnapshot& snap = tb.read_buf();
-        if (snap.valid) render_from_snapshot(snap);
-        vol_overlay.tick(screen, TFT_BLACK);
-        vTaskDelayUntil(&last_wake, period);
-      }
-      vTaskDelete(NULL);
+    void render_frame() {
+      GameSnapshot& snap = tb.read_buf();
+      if (snap.valid) render_from_snapshot(snap);
     }
 
     /*

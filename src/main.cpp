@@ -6,7 +6,7 @@
 #include <audio.h>
 #include <input.h>
 
-#include "tetris/yomotetris.h"
+#include "yomogame.h"
 
 // 1:ok   2:LED  3:JTAG_EN  4:ok  5:ok     6:ok     7:ok     8:ok     9:ok  10:ok
 // 11:ok 12:ok  13:ok      14:ok 15:uart? 16:uart? 17:uart? 18:uart? 19:usb 20:usbpio pkg list
@@ -45,16 +45,16 @@ void setup() {
   Serial.printf("Reset reason: %d\n", esp_reset_reason());
 
   // screen setting
-  TFT_eSPI screen = TFT_eSPI();
+  static TFT_eSPI screen;
   screen.init();
   screen.fillScreen(TFT_BLACK);
 
   static input::Buttons buttons(btnA, btnB, btnS, btnE, btnR, btnU, btnD, btnL);
   static input::VolumeButtons volume_buttons(btnVolUp, btnVolDown);
-  static audio::Audio engine(pinI2SBCLK, pinI2SLRC, pinI2SDIN, volume_buttons);
+  static audio::Audio audio(pinI2SBCLK, pinI2SLRC, pinI2SDIN, volume_buttons);
 
-  YomoTetris* tetris = new YomoTetris(engine, buttons, screen, disp_param_240x240);
-  tetris->start();
+  static yomogame::MainLoop mainloop(screen, audio, buttons);
+  mainloop.run(); // never returns
 }
 
 void loop() {

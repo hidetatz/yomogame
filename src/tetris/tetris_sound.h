@@ -3,29 +3,29 @@
 #include <audio.h>
 
 #include <Arduino.h>
-#include <atomic>
-#include <math.h>
 #include <string.h>
 
-#include <driver/i2s.h>
 #include <LittleFS.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include <freertos/queue.h>
 
 struct Command {
-  enum Type : uint8_t { PlayCursorSFX, PlayCountdownSFX, PlayHardDropSFX, PlayHoldSFX, PlayClearLines123SFX, PlayTetrisSFX, PlayPauseSFX, PlayResumeSFX, PlayCancelSFX, PlaySuccessSFX, PlayFailSFX, StartBGM, StopBGM } type;
+  enum Type : uint8_t {
+    PlayCursorSFX, PlayCountdownSFX, PlayHardDropSFX, PlayHoldSFX,
+    PlayClearLines123SFX, PlayTetrisSFX, PlayPauseSFX, PlayResumeSFX,
+    PlayCancelSFX, PlaySuccessSFX, PlayFailSFX, StartBGM, StopBGM
+  } type;
 };
 
 class SFX {
   public:
-    int16_t* pcm;
+    int16_t* pcm{nullptr};
     uint32_t length{0};
 
-    SFX(std::string filepath) {
-      File f = LittleFS.open(filepath.c_str(), "r");
+    void load(const char* filepath) {
+      File f = LittleFS.open(filepath, "r");
       if (!f) {
-        Serial.printf("file %s not found\n", filepath.c_str());
+        Serial.printf("file %s not found\n", filepath);
         abort();
       }
       size_t bytes = f.size();
@@ -36,7 +36,7 @@ class SFX {
     }
 };
 
-struct Voice {const int16_t* pcm; uint32_t len; uint32_t pos;};
+struct Voice { const int16_t* pcm; uint32_t len; uint32_t pos; };
 
 class Sound {
   public:
@@ -45,132 +45,23 @@ class Sound {
         Serial.println("[audio] LittleFS mount failed — run: pio run -t uploadfs");
       }
       queue = xQueueCreate(24, sizeof(Command));
+      fade_step = 1.0f / (audio.sample_rate * fade_ms / 1000.0f);
     }
 
     void begin() {
-      xTaskCreatePinnedToCore(audio_consumer_loop_trampoline, "audio_consumer_loop", 8192, this, 8, nullptr, 0);
-    }
+      cursor.load("/tetris/sfx_cursor.raw");
+      countdown.load("/tetris/sfx_countdown.raw");
+      hard_drop.load("/tetris/sfx_hard_drop.raw");
+      hold.load("/tetris/sfx_hold.raw");
+      clear_lines_123.load("/tetris/sfx_clear_lines_123.raw");
+      tetris.load("/tetris/sfx_tetris.raw");
+      pause.load("/tetris/sfx_pause.raw");
+      resume.load("/tetris/sfx_resume.raw");
+      cancel.load("/tetris/sfx_cancel.raw");
+      success.load("/tetris/sfx_success.raw");
+      fail.load("/tetris/sfx_fail.raw");
 
-    static void audio_consumer_loop_trampoline(void* param) {
-      static_cast<Sound*>(param)->audio_consumer_loop();
-    }
-
-    void audio_consumer_loop() {
-      audio.init();
-
-      // load sfx on ram
-      SFX cursor = SFX("/tetris/sfx_cursor.raw");
-      SFX countdown = SFX("/tetris/sfx_countdown.raw");
-      SFX hard_drop = SFX("/tetris/sfx_hard_drop.raw");
-      SFX hold = SFX("/tetris/sfx_hold.raw");
-      SFX clear_lines_123 = SFX("/tetris/sfx_clear_lines_123.raw");
-      SFX tetris = SFX("/tetris/sfx_tetris.raw");
-      SFX pause = SFX("/tetris/sfx_pause.raw");
-      SFX resume = SFX("/tetris/sfx_resume.raw");
-      SFX cancel = SFX("/tetris/sfx_cancel.raw");
-      SFX success = SFX("/tetris/sfx_success.raw");
-      SFX fail = SFX("/tetris/sfx_fail.raw");
-
-      File bgm;
-      bool want_bgm = false;
-
-      int16_t bgm_chunk[256];
-      int16_t i2s_buf[512];
-
-      int fade_ms = 150;
-      float fade_step = 1.0f / (audio.sample_rate * fade_ms / 1000.0f);
-      float fade = 0.0f;
-
-      while (true) {
-        Command c;
-        while (xQueueReceive(queue, &c, 0) == pdTRUE) {
-          switch (c.type) {
-            case Command::PlayCursorSFX:
-              enqueue_voice(cursor);
-              break;
-            case Command::PlayCountdownSFX:
-              enqueue_voice(countdown);
-              break;
-            case Command::PlayHardDropSFX:
-              enqueue_voice(hard_drop);
-              break;
-            case Command::PlayHoldSFX:
-              enqueue_voice(hold);
-              break;
-            case Command::PlayClearLines123SFX:
-              enqueue_voice(clear_lines_123);
-              break;
-            case Command::PlayTetrisSFX:
-              enqueue_voice(tetris);
-              break;
-            case Command::PlayPauseSFX:
-              enqueue_voice(pause);
-              break;
-            case Command::PlayResumeSFX:
-              enqueue_voice(resume);
-              break;
-            case Command::PlayCancelSFX:
-              enqueue_voice(cancel);
-              break;
-            case Command::PlaySuccessSFX:
-              enqueue_voice(success);
-              break;
-            case Command::PlayFailSFX:
-              enqueue_voice(fail);
-              break;
-            case Command::StartBGM:
-              if (bgm) bgm.close();
-              bgm = LittleFS.open("/tetris/iwashiro_dokudoku_dog.raw", "r");
-              want_bgm = (bool)bgm;
-              fade = 0.0;
-              if (!want_bgm) Serial.println("[audio] bgm open failed (uploadfs?)");
-              break;
-            case Command::StopBGM: want_bgm = false; break;
-          }
-        }
-
-        if (bgm) {
-          int got = bgm.read((uint8_t*)bgm_chunk, sizeof(bgm_chunk)) / 2;
-          while (got < 256) {
-            bgm.seek(0);
-            int n = bgm.read((uint8_t*)(bgm_chunk + got), (256 - got) * 2) / 2;
-            if (n <= 0) break;
-            got += n;
-          }
-          for (int i = got; i < 256; i++) bgm_chunk[i] = 0;
-        } else {
-          memset(bgm_chunk, 0, sizeof(bgm_chunk));
-        }
-
-        // mix
-        float fade_target = want_bgm ? 1.0f : 0.0f;
-        for (int i = 0; i < 256; i++) {
-          // fade in
-          if (fade < fade_target) { fade += fade_step; if (fade > fade_target) fade = fade_target; }
-          // fade out
-          else if (fade > fade_target) { fade -= fade_step; if (fade < fade_target) fade = fade_target; }
-
-          // apply fade
-          int32_t acc = ((int32_t)bgm_chunk[i] * fade);
-
-          for (int j = 0; j < 4; j++) {
-            Voice& v = voices[j];
-            if (!v.pcm) continue;
-            acc += v.pcm[v.pos++];
-            if (v.pos >= v.len) v.pcm = nullptr;
-          }
-
-          if (acc > 32767) acc = 32767;
-          if (acc < -32768) acc = -32768;
-
-          i2s_buf[2 * i]     = (int16_t)acc;
-          i2s_buf[2 * i + 1] = (int16_t)acc;
-        }
-
-        if (!want_bgm && fade == 0.0f && bgm) bgm.close();
-
-        audio.send_buffer(i2s_buf, 512);
-      }
+      audio.set_source(&Sound::fill_trampoline, this);
     }
 
     void sound_cursor()          { send(Command::PlayCursorSFX); }
@@ -188,20 +79,92 @@ class Sound {
     void stop_bgm()              { send(Command::StopBGM); }
 
   private:
-    QueueHandle_t queue = nullptr;
     audio::Audio& audio;
+    QueueHandle_t queue = nullptr;
     Voice voices[4] = {};
 
-    void send(Command::Type t) { Command c{t}; xQueueSend(queue, &c, 0); }
-    void enqueue_voice(SFX& sfx) {
-      int pick = -1;
+    File bgm;
+    bool want_bgm = false;
+    int16_t bgm_chunk[audio::Audio::kFrames];
+    const int fade_ms = 150;
+    float fade_step = 0.0f;
+    float fade = 0.0f;
 
-      // find empty voice slot
-      for (int i = 0; i < 4; i++) {
-        if (!voices[i].pcm) {pick = i; break; }
+    SFX cursor, countdown, hard_drop, hold, clear_lines_123, tetris;
+    SFX pause, resume, cancel, success, fail;
+
+    static void fill_trampoline(void* ctx, int16_t* buf, int frames) {
+      static_cast<Sound*>(ctx)->fill(buf, frames);
+    }
+
+    void fill(int16_t* buf, int frames) {
+      Command c;
+      while (xQueueReceive(queue, &c, 0) == pdTRUE) {
+        switch (c.type) {
+          case Command::PlayCursorSFX:        enqueue_voice(cursor); break;
+          case Command::PlayCountdownSFX:     enqueue_voice(countdown); break;
+          case Command::PlayHardDropSFX:      enqueue_voice(hard_drop); break;
+          case Command::PlayHoldSFX:          enqueue_voice(hold); break;
+          case Command::PlayClearLines123SFX: enqueue_voice(clear_lines_123); break;
+          case Command::PlayTetrisSFX:        enqueue_voice(tetris); break;
+          case Command::PlayPauseSFX:         enqueue_voice(pause); break;
+          case Command::PlayResumeSFX:        enqueue_voice(resume); break;
+          case Command::PlayCancelSFX:        enqueue_voice(cancel); break;
+          case Command::PlaySuccessSFX:       enqueue_voice(success); break;
+          case Command::PlayFailSFX:          enqueue_voice(fail); break;
+          case Command::StartBGM:
+            if (bgm) bgm.close();
+            bgm = LittleFS.open("/tetris/iwashiro_dokudoku_dog.raw", "r");
+            want_bgm = (bool)bgm;
+            fade = 0.0f;
+            if (!want_bgm) Serial.println("[audio] bgm open failed (uploadfs?)");
+            break;
+          case Command::StopBGM: want_bgm = false; break;
+        }
       }
 
-      // if no empty slot, stop the biggest pos voice and use it
+      if (bgm) {
+        int got = bgm.read((uint8_t*)bgm_chunk, sizeof(bgm_chunk)) / 2;
+        while (got < frames) {
+          bgm.seek(0);
+          int n = bgm.read((uint8_t*)(bgm_chunk + got), (frames - got) * 2) / 2;
+          if (n <= 0) break;
+          got += n;
+        }
+        for (int i = got; i < frames; i++) bgm_chunk[i] = 0;
+      } else {
+        memset(bgm_chunk, 0, sizeof(bgm_chunk));
+      }
+
+      float fade_target = want_bgm ? 1.0f : 0.0f;
+      for (int i = 0; i < frames; i++) {
+        if (fade < fade_target)      { fade += fade_step; if (fade > fade_target) fade = fade_target; }
+        else if (fade > fade_target) { fade -= fade_step; if (fade < fade_target) fade = fade_target; }
+
+        int32_t acc = (int32_t)(bgm_chunk[i] * fade);
+
+        for (int j = 0; j < 4; j++) {
+          Voice& v = voices[j];
+          if (!v.pcm) continue;
+          acc += v.pcm[v.pos++];
+          if (v.pos >= v.len) v.pcm = nullptr;
+        }
+
+        if (acc > 32767) acc = 32767;
+        if (acc < -32768) acc = -32768;
+        buf[i] = (int16_t)acc;
+      }
+
+      if (!want_bgm && fade == 0.0f && bgm) bgm.close();
+    }
+
+    void send(Command::Type t) { Command c{t}; xQueueSend(queue, &c, 0); }
+
+    void enqueue_voice(SFX& sfx) {
+      int pick = -1;
+      for (int i = 0; i < 4; i++) {
+        if (!voices[i].pcm) { pick = i; break; }
+      }
       if (pick < 0) {
         pick = 0;
         for (int i = 1; i < 4; i++)
