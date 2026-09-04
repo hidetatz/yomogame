@@ -14,10 +14,10 @@ class VolumeOverlay {
     int x;
     int y;
 
-    VolumeOverlay(audio::Player& player, int width, int height, int x, int y) : player(player), width(width), height(height), x(x), y(y) {}
+    VolumeOverlay(audio::Audio& audio, int width, int height, int x, int y) : audio(audio), width(width), height(height), x(x), y(y) {}
 
     void tick(TFT_eSPI& tft, uint16_t clear_color) {
-      uint32_t seq = player.volume_generation();
+      uint32_t seq = audio.volume_generation();
       if (seq != last_seq) { last_seq = seq; visible_until = millis() + 1200; }
 
       bool visible = (int32_t)(millis() - visible_until) < 0;
@@ -26,18 +26,18 @@ class VolumeOverlay {
     }
 
   private:
-    audio::Player& player;
+    audio::Audio& audio;
 
     uint32_t last_seq = 0;
     uint32_t visible_until = 0;
     bool shown = false;
 
     void draw(TFT_eSPI& tft) {
-      int max_vol = player.max_volume();
-      int vol = player.current_volume();
+      int max = audio.max_volume();
+      int vol = audio.current_volume();
       tft.fillRect(x, y, width, height, TFT_DARKGREY);
       tft.drawRect(x, y, width, height, TFT_LIGHTGREY);
-      int filled = (width - 4) * vol / max_vol;
+      int filled = (width - 4) * vol / max;
       tft.fillRect(x + 2, y + 2, filled, height - 4, TFT_BLUE);
     }
 };

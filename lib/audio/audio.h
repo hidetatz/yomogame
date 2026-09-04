@@ -4,7 +4,6 @@
 
 #include <atomic>
 #include <algorithm>
-#include <string.h>
 
 #include <Arduino.h>
 #include <driver/i2s.h>
@@ -12,121 +11,22 @@
 
 namespace audio {
 
-class Player {
+class Audio {
   public:
-    Player(int pin_BCLK, int pin_LRC, int pin_DIN, input::VolumeButtons& vol) :
+    uint32_t sample_rate{22050};
+
+    Audio(int pin_BCLK, int pin_LRC, int pin_DIN, input::VolumeButtons& vol) :
     pin_BCLK(pin_BCLK),
     pin_LRC(pin_LRC),
     pin_DIN(pin_DIN),
     vol(vol) {}
 
-    using SoundSourceFn = void (*)(void* ctx, int16_t* buf, int frames);
-
-    void begin() {
-      xTaskCreatePinnedToCore(start_play_task_trampoline, "start_play_task", 4096, this, 8, nullptr, 0);
-      xTaskCreatePinnedToCore(volume_monitoring_task_trampoline, "volume_monitoring_task", 3072, this, 1, nullptr, 1);
-    }
-
-    void set_source(SoundSourceFn fn, void* ctx) {
-      portENTER_CRITICAL(&src_mux);
-      src = fn; src_ctx = ctx;
-      portEXIT_CRITICAL(&src_mux);
-    }
-
-    uint32_t sampling_rate() const { return sample_rate; }
-    int current_volume() const { return master_volume.load(); }
-    int max_volume() const { return volume_max; }
-    uint32_t volume_generation() const { return vol_generation.load(); }
-
-  private:
-    // pin
-    int pin_BCLK;
-    int pin_LRC;
-    int pin_DIN;
-
-    // i2s dma
-    int dma_buf_count{8};
-    int dma_buf_len{256};
-
-    // sampling rate
-    uint32_t sample_rate{22050};
-
-    // sound source
-    SoundSourceFn src = nullptr;
-    void* src_ctx = nullptr;
-    portMUX_TYPE src_mux = portMUX_INITIALIZER_UNLOCKED;
-
-    // volume control
-    input::VolumeButtons& vol;
-    std::atomic<int> master_volume{5};
-    const int volume_max{16};
-    float vol_gains[17]{
-      0.0000f, 0.0056f, 0.0079f, 0.0112f, 0.0158f, 0.0224f, 0.0316f, 0.0447f,
-      0.0631f, 0.0891f, 0.1259f, 0.1778f, 0.2512f, 0.3548f, 0.5012f, 0.7079f, 1.0000f
-    };
-    Preferences prefs;
-    std::atomic<uint32_t> vol_generation{0};
-
-    static void start_play_task_trampoline(void* param) {
-      static_cast<Player*>(param)->start_play();
-    }
-
-    void start_play() {
+    void init() {
       prefs.begin("audio", false);
       master_volume.store(std::clamp(prefs.getInt("volume", 5), 0, volume_max));
-      install_i2s();
 
-      int16_t mono[256], stereo[512];
-      while (true) {
-        // fetch sound from sound source
-        portENTER_CRITICAL(&src_mux);
-        SoundSourceFn f = src; void* c = src_ctx;
-        portEXIT_CRITICAL(&src_mux);
-        if (f) f(c, mono, 256);
-        else memset(mono, 0, sizeof(mono));
+      /* configure i2s */
 
-        // apply gain
-        float gain = vol_gains[master_volume.load()];
-        for (int i = 0; i < 256; i++) {
-          int32_t v = (int32_t)(mono[i] * gain);
-          if (v > 32767) v = 32767;
-          if (v < -32768) v = -32768;
-          mono[i] = (int16_t)v;
-        }
-
-        // copy to stereo
-        for (int i = 0; i < 256; i++) stereo[i*2] = stereo[i*2+1] = mono[i];
-
-        // send i2s
-        size_t written = 0;
-        i2s_write(I2S_NUM_0, stereo, 512 * sizeof(uint16_t), &written, portMAX_DELAY); // blocks
-      }
-    }
-
-    static void volume_monitoring_task_trampoline(void* param) {
-      static_cast<Player*>(param)->volume_monitoring_task();
-    }
-
-    void volume_monitoring_task() {
-      input::VolumeButtonState prev;
-      while (true) {
-        input::VolumeButtonState btns = vol.get();
-        if (btns.UP   && !prev.UP) set_volume(master_volume.load() + 1);
-        if (btns.DOWN && !prev.DOWN) set_volume(master_volume.load() - 1);
-        prev = btns;
-        vTaskDelay(pdMS_TO_TICKS(30));
-      }
-    }
-
-    void set_volume(int v) {
-      int clamped = std::clamp(v, 0, volume_max);
-      if (clamped == master_volume.load()) return;
-      master_volume.store(clamped);
-      vol_generation.fetch_add(1, std::memory_order_relaxed);
-      prefs.putInt("volume", clamped);
-    }
-
-    void install_i2s() {
       i2s_config_t cfg = {
         .mode                 = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
         .sample_rate          = sample_rate,
@@ -152,6 +52,71 @@ class Player {
       };
       i2s_set_pin(I2S_NUM_0, &pins);
       i2s_zero_dma_buffer(I2S_NUM_0);
+
+      /* start volume monitoring loop */
+      xTaskCreatePinnedToCore(volume_monitoring_task_trampoline, "volume_monitoring_task", 3072, this, 1, nullptr, 1);
+    }
+
+    int send_buffer(int16_t *buffer, int length) {
+      float gain = vol_gains[master_volume.load()];
+      for (int i = 0; i < length; i++) {
+        int32_t v = (int32_t)(buffer[i] * gain);
+        if (v > 32767) v = 32767;
+        if (v < -32768) v = -32768;
+        buffer[i] = (int16_t)v;
+      }
+      size_t written = 0;
+      i2s_write(I2S_NUM_0, buffer, length * sizeof(uint16_t), &written, portMAX_DELAY);
+      return written;
+    }
+
+    int current_volume() { return master_volume.load(); }
+    int max_volume() { return volume_max; }
+    uint32_t volume_generation() { return vol_generation.load(); }
+
+  private:
+    int pin_BCLK;
+    int pin_LRC;
+    int pin_DIN;
+
+    input::VolumeButtons& vol;
+
+    float vol_gains[17]{
+      0.0000f, 0.0056f, 0.0079f, 0.0112f, 0.0158f, 0.0224f, 0.0316f, 0.0447f,
+      0.0631f, 0.0891f, 0.1259f, 0.1778f, 0.2512f, 0.3548f, 0.5012f, 0.7079f, 1.0000f
+    };
+
+    int dma_buf_count{8};
+    int dma_buf_len{256};
+
+    std::atomic<int> master_volume{5};
+    const int volume_max{16};
+
+    Preferences prefs;
+
+    std::atomic<uint32_t> vol_generation{0};
+
+    static void volume_monitoring_task_trampoline(void* param) {
+      static_cast<Audio*>(param)->volume_monitoring_task();
+    }
+
+    void set_volume(int v) {
+      int clamped = std::clamp(v, 0, volume_max);
+      if (clamped == master_volume.load()) return;
+      master_volume.store(clamped);
+      vol_generation.fetch_add(1, std::memory_order_relaxed);
+      prefs.putInt("volume", clamped);
+    }
+
+    void volume_monitoring_task() {
+      input::VolumeButtonState prev;
+      while (true) {
+        input::VolumeButtonState btns = vol.get();
+        if (btns.UP   && !prev.UP) set_volume(master_volume.load() + 1);
+        if (btns.DOWN && !prev.DOWN) set_volume(master_volume.load() - 1);
+        prev = btns;
+        vTaskDelay(pdMS_TO_TICKS(30));
+      }
     }
 };
   
