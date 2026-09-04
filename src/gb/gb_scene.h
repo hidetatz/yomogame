@@ -31,9 +31,9 @@ namespace gb {
 class GbScene;
 static GbScene* g_active_gb = nullptr;
 
-// Pick a .gb ROM from SD, then run Peanut-GB on a core-1 task. DMG only; the
-// Game Boy Color palette is not emulated (DMG-compatible GBC games run in
-// grayscale/green).
+// Pick a .gb/.gbc ROM from SD, then run Peanut-GB on a core-1 task. Runs GBC
+// (CGB=0x80/0xC0) carts in color when PEANUT_FULL_GBC_SUPPORT is on; DMG-only
+// carts always render in the fixed DMG-green palette below.
 class GbScene : public Scene {
   public:
     void enter(Context& ctx) override {
@@ -100,7 +100,15 @@ class GbScene : public Scene {
     bool dirty_{true};
     input::ButtonState prev_{};
 
-    struct gb_s gb_;
+    // gb_s holds WRAM/VRAM (32KB+16KB in CGB mode) and is touched on every
+    // single emulated instruction/pixel; it must live in fast internal RAM.
+    // As a plain embedded member, GbScene's total size (WRAM+VRAM pushed it
+    // well past ESP32 Arduino's PSRAM-auto-routing threshold) would land the
+    // whole object -- gb_s included -- in slow PSRAM, causing the sluggish
+    // gameplay and crackly audio seen after enabling CGB support. Allocating
+    // it separately with MALLOC_CAP_INTERNAL keeps it off PSRAM regardless of
+    // how big GbScene itself grows.
+    struct gb_s* gb_{nullptr};
     struct minigb_apu_ctx apu_;
     uint8_t* rom_{nullptr};
     uint8_t* cart_ram_{nullptr};
@@ -109,8 +117,35 @@ class GbScene : public Scene {
     char sav_path_[64]{};
     volatile bool sram_dirty_{false};
     volatile uint32_t sram_dirty_at_{0};
+    volatile uint32_t sram_write_bytes_{0};   // writes in the current RAM-enabled window
+    volatile uint8_t  sram_banks_touched_{0}; // bitmask of cart_ram_bank written this window
+    bool prev_en_ram_{false};
     uint32_t saved_hash_{0};
-    uint16_t pal_[4]{};        // shade -> big-endian RGB565
+
+    // A real in-game save writes a large burst (a good fraction of the cart's
+    // SRAM, and/or to a bank other than 0) and then disables cart RAM. Smaller
+    // bank-0-only bursts are scratch use (e.g. Pokemon Gen 1 sprite
+    // decompression) and are not saved. The byte threshold scales with the
+    // cart's save size (see save_burst_threshold()): fixed at 4096 for large
+    // multi-bank saves (Pokemon), but proportionally smaller for carts with
+    // little SRAM (e.g. MBC2's ~512 bytes), which would otherwise never clear
+    // a fixed 4096-byte bar and always fall back to the 2-minute safety flush.
+    static constexpr uint32_t kSaveBurstBytesMax = 4096;
+    static constexpr uint32_t kSaveBurstBytesMin = 64;
+    static constexpr uint32_t kSaveFallbackMs = 120000;   // last-resort flush
+
+    uint32_t save_burst_threshold() const {
+      uint32_t t = save_size_ / 4;
+      if (t < kSaveBurstBytesMin) t = kSaveBurstBytesMin;
+      if (t > kSaveBurstBytesMax) t = kSaveBurstBytesMax;
+      if (t > save_size_) t = save_size_;   // never unreachable on tiny carts
+      return t;
+    }
+    uint16_t pal_[4]{};        // DMG shade -> big-endian RGB565
+#if PEANUT_FULL_GBC_SUPPORT
+    bool cgb_mode_{false};
+    uint16_t cgb_pal565_[64]{};   // CGB BG+OBJ palette -> big-endian RGB565, refreshed per frame
+#endif
     FramePusher pusher_;
     StreamBufferHandle_t audio_ring_{nullptr};
     TaskHandle_t emu_task_{nullptr};
@@ -170,29 +205,64 @@ class GbScene : public Scene {
       s.drawString("A: play", 120, 220, 1);
     }
 
-    /* ---- Peanut-GB callbacks (priv == this) ---- */
+    /* ---- Peanut-GB callbacks (priv == this) ----
+     *
+     * These run on the emulator task, cb_rom/cb_ram_r/cb_ram_w up to millions
+     * of times per second (every ROM/RAM access from the CPU core, which is
+     * itself built at -O3). This whole file, though, is pulled into the same
+     * translation unit as tetris/audio (via yomogame.h) at the project's
+     * default optimization -- a blanket #pragma GCC optimize here would leak
+     * into that unrelated code exactly like the -O2-caused Tetris regression
+     * we hit earlier, so these are opted in individually via the `optimize`
+     * function attribute instead, which is scoped to just the function. */
 
-    static uint8_t cb_rom(struct gb_s* g, const uint_fast32_t a) {
+    static uint8_t cb_rom(struct gb_s* g, const uint_fast32_t a) __attribute__((optimize("O2"))) {
       return static_cast<GbScene*>(g->direct.priv)->rom_[a];
     }
-    static uint8_t cb_ram_r(struct gb_s* g, const uint_fast32_t a) {
+    static uint8_t cb_ram_r(struct gb_s* g, const uint_fast32_t a) __attribute__((optimize("O2"))) {
       return static_cast<GbScene*>(g->direct.priv)->cart_ram_[a];
     }
-    static void cb_ram_w(struct gb_s* g, const uint_fast32_t a, const uint8_t v) {
+    static void cb_ram_w(struct gb_s* g, const uint_fast32_t a, const uint8_t v) __attribute__((optimize("O2"))) {
       GbScene* self = static_cast<GbScene*>(g->direct.priv);
       self->cart_ram_[a] = v;
       self->sram_dirty_ = true;
       self->sram_dirty_at_ = millis();
+      if (self->sram_write_bytes_ < 0x40000) self->sram_write_bytes_++;
+      self->sram_banks_touched_ |= (uint8_t)(1u << (g->cart_ram_bank & 7));
     }
     static void cb_err(struct gb_s*, const enum gb_error_e e, const uint16_t a) {
       Serial.printf("[gb] fatal error %d @ %04x\n", (int)e, a);
       for (;;) vTaskDelay(portMAX_DELAY);   // gb_error must not return
     }
-    static void cb_line(struct gb_s* g, const uint8_t* px, const uint_fast8_t line) {
+    static void cb_line(struct gb_s* g, const uint8_t* px, const uint_fast8_t line) __attribute__((optimize("O2"))) {
       GbScene* self = static_cast<GbScene*>(g->direct.priv);
       uint16_t* dst = self->pusher_.back() + (int)line * GBW;
+#if PEANUT_FULL_GBC_SUPPORT
+      if (self->cgb_mode_) {
+        if (line == 0) self->refresh_cgb_palette();
+        // In CGB mode `px[x]` (0-0x3F) already indexes the 64-entry BG+OBJ
+        // palette table (see peanut_gb.h's CGB pixel encoding).
+        for (int x = 0; x < GBW; x++) dst[x] = self->cgb_pal565_[px[x] & 0x3F];
+        return;
+      }
+#endif
       for (int x = 0; x < GBW; x++) dst[x] = self->pal_[px[x] & 3];
     }
+
+#if PEANUT_FULL_GBC_SUPPORT
+    // CGB palette memory (gb_->cgb.fixPalette) holds 15-bit BGR555 (R/B
+    // swapped by Peanut-GB); refreshed once per frame rather than per pixel.
+    void refresh_cgb_palette() __attribute__((optimize("O2"))) {
+      for (int i = 0; i < 64; i++) {
+        uint16_t v = gb_->cgb.fixPalette[i];
+        uint8_t b5 = v & 0x1F;
+        uint8_t g5 = (v >> 5) & 0x1F;
+        uint8_t r5 = (v >> 10) & 0x1F;
+        uint16_t c = (uint16_t)(r5 << 11) | (uint16_t)((g5 << 1) | (g5 >> 4)) << 5 | b5;
+        cgb_pal565_[i] = (uint16_t)((c << 8) | (c >> 8));   // big-endian (matches FramePusher)
+      }
+    }
+#endif
 
     /* ---- audio source (runs on the core-0 audio task) ---- */
 
@@ -235,20 +305,26 @@ class GbScene : public Scene {
         uint8_t cgb = rom_[0x143];   // 0x80 = CGB-enhanced, 0xC0 = CGB-only
         Serial.printf("[gb] '%s'  CGB=%02x (%s)  MBC=%02x  size=%u\n",
                       title, cgb,
-                      cgb == 0xC0 ? "GBC-ONLY - not supported" :
-                      cgb == 0x80 ? "GBC game, DMG mode"       : "DMG",
+                      cgb == 0xC0 ? "GBC-only" :
+                      cgb == 0x80 ? "GBC-enhanced"  : "DMG",
                       rom_[0x147], (unsigned)rom_size_);
-        if (cgb == 0xC0) { fail(ctx, "GBC-ONLY ROM - DMG ONLY"); return; }
       }
 
-      enum gb_init_error_e e = gb_init(&gb_, &cb_rom, &cb_ram_r, &cb_ram_w, &cb_err, this);
+      gb_ = (struct gb_s*)heap_caps_malloc(sizeof(struct gb_s), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      if (!gb_) { fail(ctx, "GB ALLOC FAILED"); return; }
+
+      enum gb_init_error_e e = gb_init(gb_, &cb_rom, &cb_ram_r, &cb_ram_w, &cb_err, this);
       if (e != GB_INIT_NO_ERROR) {
         Serial.printf("[gb] gb_init error %d\n", (int)e);
         fail(ctx, e == GB_INIT_CARTRIDGE_UNSUPPORTED ? "UNSUPPORTED CART" : "GB INIT FAILED");
         return;
       }
+#if PEANUT_FULL_GBC_SUPPORT
+      cgb_mode_ = gb_->cgb.cgbMode;
+      Serial.printf("[gb] running in %s mode\n", cgb_mode_ ? "CGB (color)" : "DMG");
+#endif
 
-      save_size_ = gb_get_save_size(&gb_);
+      save_size_ = gb_get_save_size(gb_);
       cart_ram_ = (uint8_t*)heap_caps_malloc(save_size_ ? save_size_ : 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
       if (cart_ram_ && save_size_) memset(cart_ram_, 0, save_size_);
 
@@ -265,7 +341,7 @@ class GbScene : public Scene {
         saved_hash_ = hash(cart_ram_, save_size_);
       }
 
-      gb_init_lcd(&gb_, &cb_line);
+      gb_init_lcd(gb_, &cb_line);
       minigb_apu_audio_init(&apu_);
       gb_bind_apu(&apu_);
 
@@ -274,7 +350,10 @@ class GbScene : public Scene {
       pal_[2] = mk565(0x34, 0x68, 0x56);
       pal_[3] = mk565(0x08, 0x18, 0x20);
 
-      audio_ring_ = xStreamBufferCreate(4096, 1);
+      // ~185ms of slack @ 22050Hz mono (same size NES uses): absorbs the emu
+      // task's occasional heavier frames (ROM bank switches, CGB HDMA)
+      // without an audible underrun, without adding much input-to-audio lag.
+      audio_ring_ = xStreamBufferCreate(8192, 1);
       ctx.audio.set_source(&audio_fill, this);
 
       screen_->fillScreen(TFT_BLACK);   // wipe the ROM picker
@@ -308,14 +387,31 @@ class GbScene : public Scene {
       return h;
     }
 
-    // Runs on the emulator task. Writes cart RAM to SD only when it actually
-    // changed and the game's write burst has settled (~1s of quiet). The SD
-    // write shares the TFT SPI bus, so the display stutters for a few frames.
-    void maybe_save() {
-      if (!save_size_ || !sram_dirty_) return;
-      if (millis() - sram_dirty_at_ < 1000) return;   // wait for the burst to finish
-      sram_dirty_ = false;
+    // Runs on the emulator task, once per frame. Persists cart RAM to SD only
+    // when the game finishes a real save: it disables cart RAM after a large
+    // write burst (several KB, or any bank past 0). Bank-0-only scratch bursts
+    // are ignored. A 2-minute fallback covers games that never toggle the
+    // enable bit. The SD write shares the TFT SPI bus (brief display stutter).
+    void poll_save() {
+      if (!save_size_) return;
 
+      const bool en = gb_->enable_cart_ram;
+      if (en && !prev_en_ram_) {                 // RAM-enabled window opened
+        sram_write_bytes_ = 0;
+        sram_banks_touched_ = 0;
+      } else if (!en && prev_en_ram_) {          // window closed -> maybe a save
+        const bool looks_like_save = (sram_banks_touched_ & ~1u) != 0 ||
+                                     sram_write_bytes_ >= save_burst_threshold();
+        if (looks_like_save) commit_save("in-game save");
+      }
+      prev_en_ram_ = en;
+
+      if (sram_dirty_ && millis() - sram_dirty_at_ > kSaveFallbackMs)
+        commit_save("fallback");
+    }
+
+    void commit_save(const char* why) {
+      sram_dirty_ = false;
       uint32_t h = hash(cart_ram_, save_size_);
       if (h == saved_hash_) return;                    // nothing new on disk
 
@@ -324,13 +420,13 @@ class GbScene : public Scene {
       if (!f) { Serial.printf("[gb] save open failed: %s\n", sav_path_); return; }
       size_t w = f.write(cart_ram_, save_size_);
       f.close();
-      if (w == save_size_) { saved_hash_ = h; Serial.printf("[gb] saved %s\n", sav_path_); }
+      if (w == save_size_) { saved_hash_ = h; Serial.printf("[gb] saved %s (%s)\n", sav_path_, why); }
       else Serial.printf("[gb] save short write %u/%u\n", (unsigned)w, (unsigned)save_size_);
     }
 
     static void trampoline(void* p) { static_cast<GbScene*>(p)->emu_loop(); }
 
-    void emu_loop() {
+    void emu_loop() __attribute__((optimize("O2"))) {
       for (;;) {
         // Rate-limit input polling to >=12ms so Button::read()'s 10ms debounce
         // always has a window, even when the loop runs fast (startup / after an
@@ -348,9 +444,9 @@ class GbScene : public Scene {
         if (b.LEFT)   jp &= ~JOYPAD_LEFT;
         if (b.UP)     jp &= ~JOYPAD_UP;
         if (b.DOWN)   jp &= ~JOYPAD_DOWN;
-        gb_.direct.joypad = jp;
+        gb_->direct.joypad = jp;
 
-        gb_run_frame(&gb_);
+        gb_run_frame(gb_);
         pusher_.present();
 
         minigb_apu_audio_callback(&apu_, apu_stereo_);
@@ -360,7 +456,7 @@ class GbScene : public Scene {
         // audio drain rate (= native Game Boy speed).
         xStreamBufferSend(audio_ring_, apu_mono_, sizeof(apu_mono_), portMAX_DELAY);
 
-        maybe_save();
+        poll_save();
 
         // The ring-send above yields when the emulator is keeping up; this is
         // just WDT insurance for when it is not.
