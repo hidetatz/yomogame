@@ -1,0 +1,29 @@
+== NES emulator & licensing
+
+`src/nes/` is copied and modified from [`Esp32-S3-nes-emulator-by-DSN`](https://github.com/derdacavga/Esp32-S3-nes-emulator-by-DSN) (imported at commit `030c4b8`).
+Some modifications are also made.
+
+== License
+
+The upstream NES emulator code is licensed under the **GNU General Public License
+v3** (see the `LICENSE` file, copied from the DSN repository; the Nofrendo core
+originates as GPL‑licensed code by Matthew Conte). `src/nes/` in this repository
+is a **derivative work** and remains under the GPL.
+
+Because the yomogame firmware links this GPL code into a single program,
+**any distribution of a built yomogame binary (or of a device running it) is
+subject to the GPL**: recipients must be able to obtain the complete
+corresponding source code under the same terms. For that reason this repository
+as a whole is distributed under **GPL‑3.0‑or‑later**.
+
+The first‑party parts of this project (`lib/audio`, `lib/input`,
+`lib/volume_overlay`, `src/tetris/`, `src/scene.h`, `src/yomogame.h`,
+`src/main.cpp`) are written by the yomogame author. They are released here under
+the GPL as part of the combined work.
+
+== Assets
+
+Background music and sound effects are used courtesy of:
+
+イワシロ音楽素材
+https://iwashiro-sounds.work/

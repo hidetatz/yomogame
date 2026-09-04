@@ -13,42 +13,59 @@
 
 #include "scene.h"
 #include "tetris/tetris.h"
+#include "nes/nes_scene.h"
 
 namespace yomogame {
 
 class SelectScene : public Scene {
   public:
     void enter(Context& ctx) override {
-      draw(ctx);
+      dirty_ = true;
       prev_ = ctx.buttons.get();
     }
 
     Scene* tick(Context& ctx) override {
+      if (dirty_) { draw(ctx); dirty_ = false; }
+
       input::ButtonState b = ctx.buttons.get();
       Scene* next = this;
-      if (b.A && !prev_.A) next = new tetris::TetrisScene();
+      if (b.A && !prev_.A) {
+        next = (selected_ == 0) ? (Scene*)new tetris::TetrisScene()
+                                : (Scene*)new nes::NesScene();
+      }
+      if (b.DOWN && !prev_.DOWN && selected_ < kCount - 1) { selected_++; dirty_ = true; }
+      if (b.UP   && !prev_.UP   && selected_ > 0)          { selected_--; dirty_ = true; }
       prev_ = b;
       return next;
     }
 
   private:
+    static constexpr int kCount = 2;
+    static constexpr const char* kNames[kCount] = {"TETRIS", "NES"};
+
     input::ButtonState prev_{};
+    int selected_{0};
+    bool dirty_{true};
 
     void draw(Context& ctx) {
-      ctx.screen.fillScreen(TFT_BLACK);
-      ctx.screen.setTextDatum(MC_DATUM);
+      TFT_eSPI& s = ctx.screen;
+      s.fillScreen(TFT_BLACK);
+      s.setTextDatum(MC_DATUM);
+      s.setTextColor(TFT_CYAN, TFT_BLACK);
+      s.drawString("SELECT GAME", 120, 45, 2);
 
-      ctx.screen.setTextColor(TFT_CYAN, TFT_BLACK);
-      ctx.screen.drawString("SELECT GAME", 120, 55, 2);
+      const int w = 150, h = 40, x = (240 - w) / 2;
+      for (int i = 0; i < kCount; i++) {
+        int y = 85 + i * 55;
+        bool sel = i == selected_;
+        s.drawRect(x, y, w, h, TFT_WHITE);
+        s.fillRect(x + 1, y + 1, w - 2, h - 2, sel ? TFT_ORANGE : TFT_BLACK);
+        s.setTextColor(sel ? TFT_BLACK : TFT_WHITE, sel ? TFT_ORANGE : TFT_BLACK);
+        s.drawString(kNames[i], 120, y + h / 2, 2);
+      }
 
-      const int x = 55, y = 100, w = 130, h = 40;
-      ctx.screen.drawRect(x, y, w, h, TFT_WHITE);
-      ctx.screen.fillRect(x + 1, y + 1, w - 2, h - 2, TFT_ORANGE);
-      ctx.screen.setTextColor(TFT_BLACK, TFT_ORANGE);
-      ctx.screen.drawString("TETRIS", 120, y + h / 2, 2);
-
-      ctx.screen.setTextColor(TFT_GREEN, TFT_BLACK);
-      ctx.screen.drawString("PRESS A", 120, 175, 2);
+      s.setTextColor(TFT_GREEN, TFT_BLACK);
+      s.drawString("UP/DOWN + A", 120, 215, 1);
     }
 };
 
@@ -73,8 +90,8 @@ class BootScene : public Scene {
 class MainLoop {
   public:
     MainLoop(TFT_eSPI& screen, audio::Audio& audio, input::Buttons& buttons) :
-      ctx_{screen, audio, buttons},
-      overlay_(audio, 50, 10, 5, 230) {}
+      overlay_(audio, 50, 10, 5, 230),
+      ctx_{screen, audio, buttons, overlay_} {}
 
     void run() {
       ctx_.audio.begin(); // I2S bring-up on core 0
@@ -86,7 +103,7 @@ class MainLoop {
       TickType_t last = xTaskGetTickCount();
       for (;;) {
         Scene* next = cur->tick(ctx_);
-        overlay_.tick(ctx_.screen, TFT_BLACK);
+        if (!cur->owns_overlay()) overlay_.tick(ctx_.screen, TFT_BLACK);
 
         if (next != cur) {
           cur->exit(ctx_);
@@ -102,8 +119,8 @@ class MainLoop {
     }
 
   private:
-    Context ctx_;
     volui::VolumeOverlay overlay_;
+    Context ctx_;
 };
 
 } // namespace yomogame
