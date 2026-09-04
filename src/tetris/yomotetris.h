@@ -11,6 +11,7 @@
 
 #include <input.h>
 #include <audio.h>
+#include <volume_overlay.h>
 
 #include "tetris_buffer.h"
 #include "tetris_common.h"
@@ -28,10 +29,10 @@ class Game {
     TaskHandle_t logic_task_handle;
     TaskHandle_t render_task_handle;
 
-    Game(GameMode mode, int level, Sound& sound, int garbage_lines, input::Buttons &buttons, TFT_eSPI &screen, DisplayParameters &params) :
+    Game(GameMode mode, int level, Sound& sound, volui::VolumeOverlay& vol_overlay, int garbage_lines, input::Buttons &buttons, TFT_eSPI &screen, DisplayParameters &params) :
       logic_done_sem(xSemaphoreCreateBinary()),
       logic(tb, mode, level, sound, garbage_lines, buttons, logic_done_sem),
-      renderer(tb, screen, params, logic_running),
+      renderer(tb, screen, params, vol_overlay, logic_running),
       logic_task_handle(nullptr),
       render_task_handle(nullptr)
       {}
@@ -85,6 +86,7 @@ class YomoTetris {
     TFT_eSPI &screen;
     TFT_eSprite menu_sprite;
     TFT_eSprite result_sprite;
+    volui::VolumeOverlay vol_overlay;
 
     YomoTetris(audio::Audio& audio, input::Buttons buttons, TFT_eSPI &screen, DisplayParameters params) :
       dp(params),
@@ -92,7 +94,9 @@ class YomoTetris {
       buttons(buttons),
       screen(screen),
       menu_sprite(&screen),
-      result_sprite(&screen) {
+      result_sprite(&screen),
+      vol_overlay(audio, 50, 10, 5, 230)
+      {
         menu_sprite.createSprite(dp.menu_sprite_width, dp.menu_sprite_height);
         result_sprite.createSprite(dp.result_sprite_width, dp.result_sprite_height);
       }
@@ -252,6 +256,8 @@ class YomoTetris {
 
         menu_sprite.pushSprite(dp.menu_sprite_x, dp.menu_sprite_y);
 
+        vol_overlay.tick(screen, TFT_BLACK);
+
         delay(10);
       }
     }
@@ -332,7 +338,7 @@ class YomoTetris {
       while (true) {
         screen.fillScreen(TFT_BLACK);
         menu();
-        Game* game = new Game(selected_mode, selected_starting_level, sound, selected_garbage_lines, buttons, screen, dp);
+        Game* game = new Game(selected_mode, selected_starting_level, sound, vol_overlay, selected_garbage_lines, buttons, screen, dp);
 
         // countdown
         screen.fillScreen(TFT_BLACK);

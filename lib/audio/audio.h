@@ -70,6 +70,10 @@ class Audio {
       return written;
     }
 
+    int current_volume() { return master_volume.load(); }
+    int max_volume() { return volume_max; }
+    uint32_t volume_generation() { return vol_generation.load(); }
+
   private:
     int pin_BCLK;
     int pin_LRC;
@@ -90,13 +94,17 @@ class Audio {
 
     Preferences prefs;
 
+    std::atomic<uint32_t> vol_generation{0};
+
     static void volume_monitoring_task_trampoline(void* param) {
       static_cast<Audio*>(param)->volume_monitoring_task();
     }
 
     void set_volume(int v) {
       int clamped = std::clamp(v, 0, volume_max);
+      if (clamped == master_volume.load()) return;
       master_volume.store(clamped);
+      vol_generation.fetch_add(1, std::memory_order_relaxed);
       prefs.putInt("volume", clamped);
     }
 

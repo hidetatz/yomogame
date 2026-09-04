@@ -9,6 +9,7 @@
 #include <TFT_eSPI.h>
 
 #include <yomogi.h>
+#include <volume_overlay.h>
  
 #include "tetris_common.h"
 #include "tetris_buffer.h"
@@ -380,8 +381,9 @@ class GameRenderer {
     TFT_eSprite stats_sprite;
     TFT_eSprite pause_sprite;
     std::atomic<bool> &running;
+    volui::VolumeOverlay& vol_overlay;
 
-    GameRenderer(TripleBuffer &tb, TFT_eSPI &screen, DisplayParameters &dp, std::atomic<bool> &running) :
+    GameRenderer(TripleBuffer &tb, TFT_eSPI &screen, DisplayParameters &dp, volui::VolumeOverlay& vol_overlay, std::atomic<bool> &running) :
       tb(tb),
       dp(dp),
       bgcolor(TFT_BLACK),
@@ -391,7 +393,8 @@ class GameRenderer {
       hold_sprite(&screen),
       stats_sprite(&screen),
       pause_sprite(&screen),
-      running(running)
+      running(running),
+      vol_overlay(vol_overlay)
       {}
 
     void setup_screen() {
@@ -440,6 +443,7 @@ class GameRenderer {
       while (running) {
         GameSnapshot& snap = tb.read_buf();
         if (snap.valid) render_from_snapshot(snap);
+        vol_overlay.tick(screen, TFT_BLACK);
         vTaskDelayUntil(&last_wake, period);
       }
       vTaskDelete(NULL);
