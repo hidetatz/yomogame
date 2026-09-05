@@ -24,4 +24,10 @@ class Scene {
     virtual bool owns_overlay() { return false; }
 };
 
+// Defined (inline) in yomogame.h, next to SelectScene, so game scenes (which
+// don't include yomogame.h -- that would be circular, since yomogame.h
+// includes them) can return to the game-select screen without knowing its
+// concrete type.
+Scene* make_select_scene();
+
 } // namespace yomogame

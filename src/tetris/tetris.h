@@ -68,7 +68,7 @@ class TetrisScene : public Scene {
 
     Scene* tick(Context& ctx) override {
       switch (state_) {
-        case State::MENU:      tick_menu(ctx);      break;
+        case State::MENU:      if (Scene* s = tick_menu(ctx)) return s; break;
         case State::COUNTDOWN: tick_countdown(ctx); break;
         case State::PLAYING:   tick_playing(ctx);   break;
         case State::RESULT:    tick_result(ctx);    break;
@@ -134,7 +134,8 @@ class TetrisScene : public Scene {
       render_menubox(s, "12", dp_.menu_garbage_12_x_in_sprite, dp_.menu_garbage_value_y_in_sprite, dp_.menu_garbage_value_width, dp_.menu_garbage_value_height, 2, focused_ == MenuFocusedItem::GARBAGE_LINES, selected_garbage_ == 12);
     }
 
-    void tick_menu(Context& ctx) {
+    // Returns non-null to switch away (back to the game-select screen).
+    Scene* tick_menu(Context& ctx) {
       if (menu_dirty_) {
         draw_menu(ctx);
         menu_dirty_ = false;
@@ -144,7 +145,10 @@ class TetrisScene : public Scene {
 
       if (btns.A && !prev_.A) {
         enter_countdown(ctx);
-        return;
+        return nullptr;
+      }
+      if (btns.B && !prev_.B) {
+        return make_select_scene();
       }
 
       auto before = std::make_tuple(focused_, selected_mode_, selected_level_, selected_garbage_);
@@ -187,6 +191,7 @@ class TetrisScene : public Scene {
         menu_dirty_ = true;
         sound_->sound_cursor();
       }
+      return nullptr;
     }
 
     void enter_countdown(Context& ctx) {
@@ -358,7 +363,7 @@ class TetrisScene : public Scene {
     void render_menu_msg(TFT_eSPI& sprite, int x, int y, uint8_t font) {
       sprite.setTextColor(TFT_GREEN, TFT_BLACK);
       sprite.setTextDatum(TC_DATUM);
-      sprite.drawString("PRESS A TO START", x, y, font);
+      sprite.drawString("A:START  B:BACK", x, y, font);
     }
 };
 

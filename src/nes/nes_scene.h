@@ -4,6 +4,8 @@
 #include <SPI.h>
 #include <SD.h>
 #include <FS.h>
+#include <stdlib.h>
+#include <strings.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -65,7 +67,7 @@ class NesScene : public Scene {
 
     Scene* tick(Context& ctx) override {
       switch (state_) {
-        case State::PICK: tick_pick(ctx); break;
+        case State::PICK: if (Scene* s = tick_pick(ctx)) return s; break;
         case State::RUN:  break;   // emulator task owns everything
         case State::DEAD: break;
       }
@@ -73,8 +75,9 @@ class NesScene : public Scene {
     }
 
     void exit(Context& ctx) override {
-      // The emulator task cannot be safely stopped; this scene is never exited
-      // in the current flow. If that changes, tear the task down here first.
+      // Only reachable from PICK (B returns to the game-select screen); once
+      // RUN starts the emulator task, this scene is never exited -- that task
+      // cannot be safely stopped, so tear it down here first if that changes.
       ctx.audio.set_source(nullptr, nullptr);
       g_active_nes = nullptr;
     }
@@ -141,40 +144,50 @@ class NesScene : public Scene {
         f.close();
       }
       root.close();
+
+      if (rom_count_ > 1) {
+        qsort(roms_, rom_count_, sizeof(roms_[0]), [](const void* a, const void* b) {
+          return strcasecmp((const char*)a, (const char*)b);
+        });
+      }
     }
 
     /* ---- PICK ---- */
 
-    void tick_pick(Context& ctx) {
+    // Returns non-null to switch away (back to the game-select screen).
+    Scene* tick_pick(Context& ctx) {
       if (dirty_) { draw_pick(ctx); dirty_ = false; }
 
       input::ButtonState b = ctx.buttons.get();
-      if (b.A && !prev_.A) { start_emu(ctx); prev_ = b; return; }
+      if (b.A && !prev_.A) { start_emu(ctx); prev_ = b; return nullptr; }
+      if (b.B && !prev_.B) { return make_select_scene(); }
       if (b.DOWN && !prev_.DOWN && selected_ < rom_count_ - 1) { selected_++; dirty_ = true; }
       if (b.UP   && !prev_.UP   && selected_ > 0)              { selected_--; dirty_ = true; }
       prev_ = b;
+      return nullptr;
     }
 
     void draw_pick(Context& ctx) {
       TFT_eSPI& s = ctx.screen;
       s.fillScreen(TFT_BLACK);
       s.setTextDatum(TC_DATUM);
-      s.setTextColor(TFT_CYAN, TFT_BLACK);
+      s.setTextColor(TFT_GOLD, TFT_BLACK);
       s.drawString("SELECT ROM", 120, 10, 2);
 
-      s.setTextDatum(TL_DATUM);
+      s.setTextDatum(ML_DATUM);   // middle-left: vertically centers each row's text in its bar
       int top = selected_ < 6 ? 0 : selected_ - 5;
+      const int bar_h = 18;
       for (int i = 0; i < 6 && top + i < rom_count_; i++) {
         int idx = top + i;
-        int y = 45 + i * 28;
+        int y = 45 + i * 28;   // vertical center of this row
         bool sel = idx == selected_;
-        s.fillRect(6, y - 3, 228, 24, sel ? TFT_ORANGE : TFT_BLACK);
-        s.setTextColor(sel ? TFT_BLACK : TFT_WHITE, sel ? TFT_ORANGE : TFT_BLACK);
+        s.fillRect(6, y - bar_h / 2, 228, bar_h, sel ? TFT_MAROON : TFT_BLACK);
+        s.setTextColor(TFT_WHITE, sel ? TFT_MAROON : TFT_BLACK);
         s.drawString(roms_[idx], 12, y, 1);
       }
       s.setTextDatum(TC_DATUM);
-      s.setTextColor(TFT_GREEN, TFT_BLACK);
-      s.drawString("A: play", 120, 220, 1);
+      s.setTextColor(TFT_GOLD, TFT_BLACK);
+      s.drawString("A: play   B: back", 120, 220, 1);
     }
 
     /* ---- RUN ---- */
