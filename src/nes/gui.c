@@ -529,7 +529,12 @@ void gui_sendmsg(int color, char *format, ...)
 
    va_end(arg);
 
-   msg.ttl = gui_refresh * 2;  
+   // yomogame: don't show the on-screen message overlay (e.g. "NES powered
+   // on", "ROM loaded: ...") -- this is DSN/Nofrendo's original desktop-UI
+   // debug HUD and has no place in our shell. Leaving msg.ttl at 0 means
+   // gui_frame()'s `if (msg.ttl) gui_updatemsg();` never fires, so the text
+   // is recorded (for the NOFRENDO_DEBUG log path above) but never blitted
+   // into the shared framebuffer.
    msg.color = color;
 }
 
