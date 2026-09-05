@@ -139,12 +139,38 @@ class Audio {
       prefs.putInt("volume", clamped);
     }
 
+    // Tap = one step. Hold = one step immediately, then repeats every
+    // kRepeatIntervalMs after an initial kInitialDelayMs, until released.
     void volume_monitoring_task() {
+      static constexpr uint32_t kInitialDelayMs = 350;
+      static constexpr uint32_t kRepeatIntervalMs = 120;
+
       input::VolumeButtonState prev;
+      uint32_t next_repeat_up = 0, next_repeat_down = 0;
+
       while (true) {
         input::VolumeButtonState btns = vol.get();
-        if (btns.UP   && !prev.UP)   set_volume(master_volume.load() + 1);
-        if (btns.DOWN && !prev.DOWN) set_volume(master_volume.load() - 1);
+        uint32_t now = millis();
+
+        if (btns.UP) {
+          if (!prev.UP) {
+            set_volume(master_volume.load() + 1);
+            next_repeat_up = now + kInitialDelayMs;
+          } else if (now >= next_repeat_up) {
+            set_volume(master_volume.load() + 1);
+            next_repeat_up = now + kRepeatIntervalMs;
+          }
+        }
+        if (btns.DOWN) {
+          if (!prev.DOWN) {
+            set_volume(master_volume.load() - 1);
+            next_repeat_down = now + kInitialDelayMs;
+          } else if (now >= next_repeat_down) {
+            set_volume(master_volume.load() - 1);
+            next_repeat_down = now + kRepeatIntervalMs;
+          }
+        }
+
         prev = btns;
         vTaskDelay(pdMS_TO_TICKS(30));
       }
