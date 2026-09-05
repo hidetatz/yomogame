@@ -1,38 +1,32 @@
 == Emulators & licensing
 
-**NES** — `src/nes/` is copied and modified from
-[`Esp32-S3-nes-emulator-by-DSN`](https://github.com/derdacavga/Esp32-S3-nes-emulator-by-DSN)
-(imported at commit `030c4b8`), which is a fork of Nofrendo by Matthew Conte.
-Some modifications are made (display/audio/ROM glue).
+NES — src/nes/ is copied and modified from Esp32-S3-nes-emulator-by-DSN (https://github.com/derdacavga/Esp32-S3-nes-emulator-by-DSN) imported at commit 030c4b8.
+Some modifications are made.
 
-**Game Boy** — `src/gb/` bundles
-[Peanut-GB](https://github.com/deltabeard/Peanut-GB) (`peanut_gb.h`) and its
-`minigb_apu` APU library, unmodified except for a small include guard in
-`minigb_apu.h`. DMG (original Game Boy) only; Game Boy Color games run in
-grayscale where they run at all. `src/gb/gb_scene.h` and `src/gb/gb_core.c` are
-first‑party glue.
+Game Boy — src/gb/ is copied and modified from Peanut-GB (https://github.com/deltabeard/Peanut-GB) .
+Some modifications are made.
 
 == License
 
-The upstream **NES** emulator code is licensed under the **GNU General Public
-License v3** (see the `LICENSE` file, copied from the DSN repository; the
-Nofrendo core originates as GPL‑licensed code by Matthew Conte). `src/nes/` in
-this repository is a **derivative work** and remains under the GPL.
+The upstream NES emulator code is licensed under the GNU General Public
+License v3 (see the LICENSE file, copied from the DSN repository; the
+Nofrendo core originates as GPL‑licensed code by Matthew Conte). src/nes/ in
+this repository is a derivative work and remains under the GPL.
 
-Peanut-GB and minigb_apu (`src/gb/`) are under the **MIT License** (see
-`src/gb/peanut_gb.h` and `src/gb/LICENSE.minigb_apu`); their notices are retained.
+Peanut-GB and minigb_apu (src/gb/) are under the MIT License (see
+src/gb/peanut_gb.h and src/gb/LICENSE.minigb_apu); their notices are retained.
 MIT imposes no copyleft, but this code is combined into the same binary as the
 GPL NES core, so the paragraph below applies to the whole firmware regardless.
 
 Because the yomogame firmware links this GPL code into a single program,
-**any distribution of a built yomogame binary (or of a device running it) is
-subject to the GPL**: recipients must be able to obtain the complete
+any distribution of a built yomogame binary (or of a device running it) is
+subject to the GPL: recipients must be able to obtain the complete
 corresponding source code under the same terms. For that reason this repository
-as a whole is distributed under **GPL‑3.0‑or‑later**.
+as a whole is distributed under GPL‑3.0‑or‑later.
 
-The first‑party parts of this project (`lib/audio`, `lib/input`,
-`lib/volume_overlay`, `src/tetris/`, `src/scene.h`, `src/frame_pusher.h`,
-`src/yomogame.h`, `src/main.cpp`, `src/gb/gb_scene.h`, `src/gb/gb_core.c`) are
+The first‑party parts of this project (lib/audio, lib/input,
+lib/volume_overlay, src/tetris/, src/scene.h, src/frame_pusher.h,
+src/yomogame.h, src/main.cpp, src/gb/gb_scene.h, src/gb/gb_core.c) are
 written by the yomogame author. They are released here under the GPL as part of
 the combined work.
 
