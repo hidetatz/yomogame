@@ -187,7 +187,7 @@ class NesScene : public Scene {
       }
       s.setTextDatum(TC_DATUM);
       s.setTextColor(TFT_GOLD, TFT_BLACK);
-      s.drawString("A: play   B: back", 120, 220, 1);
+      s.drawString("A: play   B: back", 120, 210, 2);
     }
 
     /* ---- RUN ---- */

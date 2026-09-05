@@ -211,7 +211,7 @@ class GbScene : public Scene {
       }
       s.setTextDatum(TC_DATUM);
       s.setTextColor(TFT_PURPLE, TFT_BLACK);
-      s.drawString("A: play   B: back", 120, 220, 1);
+      s.drawString("A: play   B: back", 120, 210, 2);
     }
 
     /* ---- Peanut-GB callbacks (priv == this) ----

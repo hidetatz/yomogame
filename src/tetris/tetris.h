@@ -363,7 +363,7 @@ class TetrisScene : public Scene {
     void render_menu_msg(TFT_eSPI& sprite, int x, int y, uint8_t font) {
       sprite.setTextColor(TFT_GREEN, TFT_BLACK);
       sprite.setTextDatum(TC_DATUM);
-      sprite.drawString("A:START  B:BACK", x, y, font);
+      sprite.drawString("A: play   B: back", x, y, font);
     }
 };
 
