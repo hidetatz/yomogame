@@ -158,7 +158,7 @@ class GbScene : public Scene {
 
     void scan_roms() {
       rom_count_ = 0;
-      File root = SD.open("/");
+      File root = SD.open("/gb");
       if (!root) return;
       for (File f = root.openNextFile(); f && rom_count_ < kMaxRoms; f = root.openNextFile()) {
         if (!f.isDirectory()) {
@@ -271,7 +271,7 @@ class GbScene : public Scene {
 
     void start_emu(Context& ctx) {
       char path[64];
-      snprintf(path, sizeof(path), "/%s", roms_[selected_]);
+      snprintf(path, sizeof(path), "/gb/%s", roms_[selected_]);
 
       File f = SD.open(path, FILE_READ);
       if (!f) { fail(ctx, "ROM OPEN FAILED"); return; }

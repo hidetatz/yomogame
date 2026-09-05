@@ -130,7 +130,7 @@ class NesScene : public Scene {
 
     void scan_roms() {
       rom_count_ = 0;
-      File root = SD.open("/");
+      File root = SD.open("/nes");
       if (!root) return;
       for (File f = root.openNextFile(); f && rom_count_ < kMaxRoms; f = root.openNextFile()) {
         if (!f.isDirectory()) {
@@ -193,7 +193,7 @@ class NesScene : public Scene {
     /* ---- RUN ---- */
 
     void start_emu(Context& ctx) {
-      snprintf(rom_path_, sizeof(rom_path_), "/%s", roms_[selected_]);
+      snprintf(rom_path_, sizeof(rom_path_), "/nes/%s", roms_[selected_]);
 
       audio_ = &ctx.audio;
       audio_ring_ = xStreamBufferCreate(8192, 1);   // ~185ms slack @22050
