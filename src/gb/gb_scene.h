@@ -4,6 +4,8 @@
 #include <SPI.h>
 #include <SD.h>
 #include <FS.h>
+#include <stdlib.h>
+#include <strings.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -31,9 +33,12 @@ namespace gb {
 class GbScene;
 static GbScene* g_active_gb = nullptr;
 
-// Pick a .gb/.gbc ROM from SD, then run Peanut-GB on a core-1 task. Runs GBC
-// (CGB=0x80/0xC0) carts in color when PEANUT_FULL_GBC_SUPPORT is on; DMG-only
-// carts always render in the fixed DMG-green palette below.
+// Pick a .gb ROM from SD, then run Peanut-GB on a core-1 task. DMG only.
+// GBC-enhanced carts (CGB=0x80) fall back to their own DMG-compatible mode
+// and run fine in the fixed DMG-green palette below; CGB-only carts
+// (CGB=0xC0) are rejected outright, since they rely on hardware this core
+// doesn't emulate and would otherwise hang or glitch instead of failing
+// cleanly.
 class GbScene : public Scene {
   public:
     void enter(Context& ctx) override {
@@ -64,7 +69,7 @@ class GbScene : public Scene {
     }
 
     Scene* tick(Context& ctx) override {
-      if (state_ == State::PICK) tick_pick(ctx);
+      if (state_ == State::PICK) { if (Scene* s = tick_pick(ctx)) return s; }
       return this;
     }
 
@@ -100,14 +105,12 @@ class GbScene : public Scene {
     bool dirty_{true};
     input::ButtonState prev_{};
 
-    // gb_s holds WRAM/VRAM (32KB+16KB in CGB mode) and is touched on every
-    // single emulated instruction/pixel; it must live in fast internal RAM.
-    // As a plain embedded member, GbScene's total size (WRAM+VRAM pushed it
-    // well past ESP32 Arduino's PSRAM-auto-routing threshold) would land the
-    // whole object -- gb_s included -- in slow PSRAM, causing the sluggish
-    // gameplay and crackly audio seen after enabling CGB support. Allocating
-    // it separately with MALLOC_CAP_INTERNAL keeps it off PSRAM regardless of
-    // how big GbScene itself grows.
+    // gb_s holds WRAM/VRAM and is touched on every single emulated
+    // instruction/pixel; it must live in fast internal RAM. As a plain
+    // embedded member, GbScene's total size can cross ESP32 Arduino's
+    // PSRAM-auto-routing threshold and land the whole object -- gb_s
+    // included -- in slow PSRAM. Allocating it separately with
+    // MALLOC_CAP_INTERNAL keeps it off PSRAM regardless of GbScene's size.
     struct gb_s* gb_{nullptr};
     struct minigb_apu_ctx apu_;
     uint8_t* rom_{nullptr};
@@ -142,10 +145,6 @@ class GbScene : public Scene {
       return t;
     }
     uint16_t pal_[4]{};        // DMG shade -> big-endian RGB565
-#if PEANUT_FULL_GBC_SUPPORT
-    bool cgb_mode_{false};
-    uint16_t cgb_pal565_[64]{};   // CGB BG+OBJ palette -> big-endian RGB565, refreshed per frame
-#endif
     FramePusher pusher_;
     StreamBufferHandle_t audio_ring_{nullptr};
     TaskHandle_t emu_task_{nullptr};
@@ -173,36 +172,46 @@ class GbScene : public Scene {
         f.close();
       }
       root.close();
+
+      if (rom_count_ > 1) {
+        qsort(roms_, rom_count_, sizeof(roms_[0]), [](const void* a, const void* b) {
+          return strcasecmp((const char*)a, (const char*)b);
+        });
+      }
     }
 
-    void tick_pick(Context& ctx) {
+    // Returns non-null to switch away (back to the game-select screen).
+    Scene* tick_pick(Context& ctx) {
       if (dirty_) { draw_pick(ctx); dirty_ = false; }
       input::ButtonState b = ctx.buttons.get();
-      if (b.A && !prev_.A) { start_emu(ctx); prev_ = b; return; }
+      if (b.A && !prev_.A) { start_emu(ctx); prev_ = b; return nullptr; }
+      if (b.B && !prev_.B) { return make_select_scene(); }
       if (b.DOWN && !prev_.DOWN && selected_ < rom_count_ - 1) { selected_++; dirty_ = true; }
       if (b.UP   && !prev_.UP   && selected_ > 0)              { selected_--; dirty_ = true; }
       prev_ = b;
+      return nullptr;
     }
 
     void draw_pick(Context& ctx) {
       TFT_eSPI& s = ctx.screen;
       s.fillScreen(TFT_BLACK);
       s.setTextDatum(TC_DATUM);
-      s.setTextColor(TFT_CYAN, TFT_BLACK);
+      s.setTextColor(TFT_PURPLE, TFT_BLACK);
       s.drawString("SELECT ROM", 120, 10, 2);
-      s.setTextDatum(TL_DATUM);
+      s.setTextDatum(ML_DATUM);   // middle-left: vertically centers each row's text in its bar
       int top = selected_ < 6 ? 0 : selected_ - 5;
+      const int bar_h = 18;
       for (int i = 0; i < 6 && top + i < rom_count_; i++) {
         int idx = top + i;
-        int y = 45 + i * 28;
+        int y = 45 + i * 28;   // vertical center of this row
         bool sel = idx == selected_;
-        s.fillRect(6, y - 3, 228, 24, sel ? TFT_ORANGE : TFT_BLACK);
-        s.setTextColor(sel ? TFT_BLACK : TFT_WHITE, sel ? TFT_ORANGE : TFT_BLACK);
+        s.fillRect(6, y - bar_h / 2, 228, bar_h, sel ? TFT_LIGHTGREY : TFT_BLACK);
+        s.setTextColor(sel ? TFT_BLACK : TFT_LIGHTGREY, sel ? TFT_LIGHTGREY : TFT_BLACK);
         s.drawString(roms_[idx], 12, y, 1);
       }
       s.setTextDatum(TC_DATUM);
-      s.setTextColor(TFT_GREEN, TFT_BLACK);
-      s.drawString("A: play", 120, 220, 1);
+      s.setTextColor(TFT_PURPLE, TFT_BLACK);
+      s.drawString("A: play   B: back", 120, 220, 1);
     }
 
     /* ---- Peanut-GB callbacks (priv == this) ----
@@ -237,32 +246,8 @@ class GbScene : public Scene {
     static void cb_line(struct gb_s* g, const uint8_t* px, const uint_fast8_t line) __attribute__((optimize("O2"))) {
       GbScene* self = static_cast<GbScene*>(g->direct.priv);
       uint16_t* dst = self->pusher_.back() + (int)line * GBW;
-#if PEANUT_FULL_GBC_SUPPORT
-      if (self->cgb_mode_) {
-        if (line == 0) self->refresh_cgb_palette();
-        // In CGB mode `px[x]` (0-0x3F) already indexes the 64-entry BG+OBJ
-        // palette table (see peanut_gb.h's CGB pixel encoding).
-        for (int x = 0; x < GBW; x++) dst[x] = self->cgb_pal565_[px[x] & 0x3F];
-        return;
-      }
-#endif
       for (int x = 0; x < GBW; x++) dst[x] = self->pal_[px[x] & 3];
     }
-
-#if PEANUT_FULL_GBC_SUPPORT
-    // CGB palette memory (gb_->cgb.fixPalette) holds 15-bit BGR555 (R/B
-    // swapped by Peanut-GB); refreshed once per frame rather than per pixel.
-    void refresh_cgb_palette() __attribute__((optimize("O2"))) {
-      for (int i = 0; i < 64; i++) {
-        uint16_t v = gb_->cgb.fixPalette[i];
-        uint8_t b5 = v & 0x1F;
-        uint8_t g5 = (v >> 5) & 0x1F;
-        uint8_t r5 = (v >> 10) & 0x1F;
-        uint16_t c = (uint16_t)(r5 << 11) | (uint16_t)((g5 << 1) | (g5 >> 4)) << 5 | b5;
-        cgb_pal565_[i] = (uint16_t)((c << 8) | (c >> 8));   // big-endian (matches FramePusher)
-      }
-    }
-#endif
 
     /* ---- audio source (runs on the core-0 audio task) ---- */
 
@@ -305,9 +290,10 @@ class GbScene : public Scene {
         uint8_t cgb = rom_[0x143];   // 0x80 = CGB-enhanced, 0xC0 = CGB-only
         Serial.printf("[gb] '%s'  CGB=%02x (%s)  MBC=%02x  size=%u\n",
                       title, cgb,
-                      cgb == 0xC0 ? "GBC-only" :
-                      cgb == 0x80 ? "GBC-enhanced"  : "DMG",
+                      cgb == 0xC0 ? "GBC-ONLY - not supported" :
+                      cgb == 0x80 ? "GBC game, DMG mode"       : "DMG",
                       rom_[0x147], (unsigned)rom_size_);
+        if (cgb == 0xC0) { fail(ctx, "GBC-ONLY ROM - DMG ONLY"); return; }
       }
 
       gb_ = (struct gb_s*)heap_caps_malloc(sizeof(struct gb_s), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -319,10 +305,6 @@ class GbScene : public Scene {
         fail(ctx, e == GB_INIT_CARTRIDGE_UNSUPPORTED ? "UNSUPPORTED CART" : "GB INIT FAILED");
         return;
       }
-#if PEANUT_FULL_GBC_SUPPORT
-      cgb_mode_ = gb_->cgb.cgbMode;
-      Serial.printf("[gb] running in %s mode\n", cgb_mode_ ? "CGB (color)" : "DMG");
-#endif
 
       save_size_ = gb_get_save_size(gb_);
       cart_ram_ = (uint8_t*)heap_caps_malloc(save_size_ ? save_size_ : 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -351,8 +333,8 @@ class GbScene : public Scene {
       pal_[3] = mk565(0x08, 0x18, 0x20);
 
       // ~185ms of slack @ 22050Hz mono (same size NES uses): absorbs the emu
-      // task's occasional heavier frames (ROM bank switches, CGB HDMA)
-      // without an audible underrun, without adding much input-to-audio lag.
+      // task's occasional heavier frames (ROM bank switches) without an
+      // audible underrun, without adding much input-to-audio lag.
       audio_ring_ = xStreamBufferCreate(8192, 1);
       ctx.audio.set_source(&audio_fill, this);
 
