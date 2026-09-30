@@ -1,0 +1,165 @@
+(footprint "Conta_microSD_Board"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "Through hole straight pin header, 1x06, 2.54mm pitch, single row")
+	(tags "Through hole pin header THT 1x06 2.54mm single row")
+	(property "Reference" "REF**"
+		(at 0 -2.38 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "cd26236c-666a-4b96-8ca4-4d21881cc03e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Conta_microSD_Board"
+		(at 7 -20.5 0)
+		(layer "F.Fab")
+		(uuid "d6bf5b21-0335-4931-a370-98b1e83b3d9f")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "2de8d276-eefb-4b74-9c39-61e0a3c75324")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "f41d7899-f829-438c-bf51-981daade5217")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "KiLib_Generator" "connector/pin_header_socket"
+		(at 0 0 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "db5e1036-f83c-4d73-a537-c9ab19c6b0da")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_rect
+		(start -3.65 -18.73)
+		(end 16.35 1.27)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "f21b3a5a-cf72-4c3b-9cbc-f2ee09cd6594")
+	)
+	(fp_rect
+		(start -3.65 -18.73)
+		(end 16.35 1.27)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "97ec71d7-5e84-43d0-b9ca-1512430f1773")
+	)
+	(pad "" np_thru_hole circle
+		(at -1.27 -16.51)
+		(size 2.2 2.2)
+		(drill 2.2)
+		(layers "*.Cu" "*.Mask")
+		(thermal_bridge_angle 90)
+		(uuid "6317ecd1-f56b-4d60-84f4-4eda75e97e57")
+	)
+	(pad "" np_thru_hole circle
+		(at 13.97 -16.51)
+		(size 2.2 2.2)
+		(drill 2.2)
+		(layers "*.Cu" "*.Mask")
+		(thermal_bridge_angle 90)
+		(uuid "1e122e32-d871-45d6-94c3-a9aee8037f76")
+	)
+	(pad "1" thru_hole rect
+		(at 0 0 90)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "a8397b6f-42f3-4910-8de4-f3de308d88df")
+	)
+	(pad "2" thru_hole circle
+		(at 2.54 0 90)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "ef7fa554-424c-4536-8fe7-793bb241fff8")
+	)
+	(pad "3" thru_hole circle
+		(at 5.08 0 90)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "c0451323-67da-438e-97b8-5ad400d15341")
+	)
+	(pad "4" thru_hole circle
+		(at 7.62 0 90)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "b13ecdbf-9843-4133-8136-785b8734e5f9")
+	)
+	(pad "5" thru_hole circle
+		(at 10.16 0 90)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "0d5f66bc-9708-4344-94d0-800eee451686")
+	)
+	(pad "6" thru_hole circle
+		(at 12.7 0 90)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "eafa81a6-856d-4fe7-8af4-b32ca3a97411")
+	)
+	(embedded_fonts no)
+	(model "${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x06_P2.54mm_Vertical.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)

@@ -1,0 +1,4 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "yomogame") (type "KiCad") (uri "${KIPRJMOD}/yomogame.pretty") (options "") (descr ""))
+)
