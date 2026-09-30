@@ -8,36 +8,30 @@
 
 #include "yomogame.h"
 
-// 1:ok   2:LED  3:JTAG_EN  4:ok  5:ok     6:ok     7:ok     8:ok     9:ok  10:ok
-// 11:ok 12:ok  13:ok      14:ok 15:uart? 16:uart? 17:uart? 18:uart? 19:usb 20:usbpio pkg list
-// 21:ok 35:psram 36:psram 37:psram 38:ok 39:jtag(ok) 40:jtag(ok) 41:jtag(ok) 42:jtag(ok) 43:usb 44:usb
-// 45:vspi 46:log 47:ok 48:LED
+// Pin assignments, sourced from the yomogame custom PCB schematic
+// (hardware/kicad/yomogame/yomogame.kicad_sch). GPIO0 (BOOT), EN, USB_D-/D+
+// (native USB) and GPIO35-37 (octal PSRAM) are wired on the board but are not
+// application GPIOs, so they don't appear below.
 
-const int ledPin = 48;
+const int btnA = 16;
+const int btnB = 15;
+const int btnStart = 18;
+const int btnSelect = 17;
+const int btnRight = 7;
+const int btnUp = 6;
+const int btnDown = 5;
+const int btnLeft = 4;
+const int btnVolUp = 21;
+const int btnVolDown = 47;
 
-const int btnA = 1;
-const int btnB = 4;
-const int btnS = 5;
-const int btnE = 6;
-const int btnR = 7;
-const int btnU = 8;
-const int btnD = 9;
-const int btnL = 21;
-// const int btnRR = 13;
-// const int btnLL = 42;
-const int btnVolUp = 47;
-const int btnVolDown = 45;
+const int pinI2SBCLK = 46;
+const int pinI2SLRC = 9;
+const int pinI2SDIN = 3;
 
-const int pinI2SBCLK = 39;
-const int pinI2SLRC = 40;
-const int pinI2SDIN = 41;
-
-// -D TFT_CS=10
-// -D TFT_MOSI=11
-// -D TFT_SCLK=12
-// -D TFT_MISO=-1
-// -D TFT_DC=14
-// -D TFT_RST=38
+// LCD (TFT_eSPI) and SD pins are set via platformio.ini build_flags and
+// src/nes/hw_config.h respectively, both cross-checked against the same
+// schematic. Battery voltage (VBAT_SENSE, GPIO8) is read directly in
+// yomogame.h's BatteryIndicator, next to the UI that displays it.
 
 void setup() {
   // serial setting
@@ -47,9 +41,12 @@ void setup() {
   // screen setting
   static TFT_eSPI screen;
   screen.init();
+  digitalWrite(TFT_BL, LOW); // hide stale GRAM contents until cleared below
+  screen.setRotation(1);
   screen.fillScreen(TFT_BLACK);
+  digitalWrite(TFT_BL, HIGH);
 
-  static input::Buttons buttons(btnA, btnB, btnS, btnE, btnR, btnU, btnD, btnL);
+  static input::Buttons buttons(btnA, btnB, btnStart, btnSelect, btnRight, btnUp, btnDown, btnLeft);
   static input::VolumeButtons volume_buttons(btnVolUp, btnVolDown);
   static audio::Audio audio(pinI2SBCLK, pinI2SLRC, pinI2SDIN, volume_buttons);
 

@@ -17,6 +17,7 @@
 #include <input.h>
 #include <volume_overlay.h>
 
+#include "hw_config.h"
 #include "../scene.h"
 #include "../frame_pusher.h"
 
@@ -51,7 +52,7 @@ class GbScene : public Scene {
       ctx.screen.setTextColor(TFT_WHITE, TFT_BLACK);
       ctx.screen.setTextDatum(MC_DATUM);
 
-      if (!SD.begin(SD_CS_PIN, TFT_eSPI::getSPIinstance(), 10000000)) {
+      if (!SD.begin(SD_CS, sd_spi_bus(), 10000000)) {
         ctx.screen.drawString("SD MOUNT FAILED", 120, 120, 1);
         state_ = State::DEAD;
         return;
@@ -81,7 +82,6 @@ class GbScene : public Scene {
     bool owns_overlay() override { return state_ == State::RUN; }
 
   private:
-    static constexpr int SD_CS_PIN = 13;
     static constexpr int GBW = LCD_WIDTH;              // 160
     static constexpr int GBH = LCD_HEIGHT;             // 144
     static constexpr int OUTW = GBW * 3 / 2;           // 240 (1.5x, aspect-correct)

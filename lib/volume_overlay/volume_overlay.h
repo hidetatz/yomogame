@@ -31,14 +31,21 @@ class VolumeOverlay {
     uint32_t last_seq = 0;
     uint32_t visible_until = 0;
     bool shown = false;
+    TFT_eSprite* sprite = nullptr;
 
     void draw(TFT_eSPI& tft) {
+      if (!sprite) {
+        sprite = new TFT_eSprite(&tft);
+        sprite->createSprite(width, height);
+      }
+
       int max = audio.max_volume();
       int vol = audio.current_volume();
-      tft.fillRect(x, y, width, height, TFT_DARKGREY);
-      tft.drawRect(x, y, width, height, TFT_LIGHTGREY);
+      sprite->fillSprite(TFT_DARKGREY);
+      sprite->drawRect(0, 0, width, height, TFT_LIGHTGREY);
       int filled = (width - 4) * vol / max;
-      tft.fillRect(x + 2, y + 2, filled, height - 4, TFT_BLUE);
+      sprite->fillRect(2, 2, filled, height - 4, TFT_BLUE);
+      sprite->pushSprite(x, y);
     }
 };
 

@@ -102,6 +102,16 @@ class NesScene : public Scene {
 
     static constexpr int kMaxRoms = 24;
 
+    // NES output is the full, uncropped 256x240 frame (see osd.cpp); scale it
+    // down to fit the 240-wide panel width-first, aspect-correct, letterboxed
+    // top/bottom (240 * 240/256 = 225 tall).
+    static constexpr int NESW = 256;
+    static constexpr int NESH = 240;
+    static constexpr int OUTW = 240;
+    static constexpr int OUTH = OUTW * NESH / NESW;   // 225
+    static constexpr int OFFX = (240 - OUTW) / 2;     // 0
+    static constexpr int OFFY = (240 - OUTH) / 2;     // 7
+
     State state_{State::DEAD};
     TFT_eSPI* screen_{nullptr};
     volui::VolumeOverlay* overlay_{nullptr};
@@ -121,11 +131,9 @@ class NesScene : public Scene {
     /* ---- SD ---- */
 
     bool mount_sd() {
-      // Share TFT_eSPI's SPI instance (same FSPI bus, MISO already attached on
-      // GPIO42 via -D TFT_MISO=42). SPIClass::beginTransaction serialises SD and
-      // TFT access; in practice they never overlap (ROM is read fully into PSRAM
-      // before the first frame, SD untouched afterwards).
-      return SD.begin(SD_CS, TFT_eSPI::getSPIinstance(), 10000000);
+      // SD card lives on its own dedicated SPI bus (see hw_config.h), separate
+      // from the LCD's.
+      return SD.begin(SD_CS, sd_spi_bus(), 10000000);
     }
 
     void scan_roms() {
@@ -199,7 +207,7 @@ class NesScene : public Scene {
       audio_ring_ = xStreamBufferCreate(8192, 1);   // ~185ms slack @22050
       ctx.audio.set_source(&NesScene::audio_fill, this);
 
-      pusher_.begin(*screen_, overlay_, 240, 240, 240, 240, 0, 0);   // core-0 display task, no scaling
+      pusher_.begin(*screen_, overlay_, NESW, NESH, OUTW, OUTH, OFFX, OFFY);   // core-0 display task, scaled to fit width
       state_ = State::RUN;
 
       // priority 2 so the emulator preempts the shell/volume tasks; it yields

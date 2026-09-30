@@ -507,7 +507,6 @@ class GameLogic {
               hard_dropped = true;
             } else {
               // hold
-              // because R button does not exist, uses SELECT press as hold
               if (btns.SELECT) {
                 if (!hold_once_tried && board.cur_mino_exists()) {
                   sound.sound_hold();

@@ -25,9 +25,11 @@ extern "C" {
 #define NES_SCREEN_WIDTH 256
 #define NES_SCREEN_HEIGHT 240
 
-// yomogame panel is 240x240; the NES 256-wide frame is centre-cropped by 8px.
-#define OUT_WIDTH  240
-#define OUT_HEIGHT 240
+// Full, uncropped NES frame; FramePusher (see nes_scene.h) scales this down
+// to fit the 240-wide panel, letterboxed top/bottom, instead of this file
+// centre-cropping the sides off.
+#define OUT_WIDTH  NES_SCREEN_WIDTH
+#define OUT_HEIGHT NES_SCREEN_HEIGHT
 #define CROP_X ((NES_SCREEN_WIDTH - OUT_WIDTH) / 2)
 
 #define DISPLAY_WIDTH OUT_WIDTH
